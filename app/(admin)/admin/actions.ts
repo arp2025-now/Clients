@@ -1,17 +1,18 @@
 "use server";
 
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { decrypt } from "@/lib/crypto";
 import { revalidatePath } from "next/cache";
 
-// Verify caller is admin
+// Verify caller is admin using the user-facing client (has auth cookies),
+// then return the admin client (service role) for DB/Storage operations.
 async function requireAdmin() {
-  const supabase = await createAdminClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const userClient = await createClient();
+  const { data: { user } } = await userClient.auth.getUser();
   if (!user || user.email !== process.env.ADMIN_EMAIL) {
     throw new Error("Unauthorized");
   }
-  return supabase;
+  return createAdminClient();
 }
 
 export async function updateTicketStatus(ticketId: string, status: string, clientPhone?: string, clientName?: string, subject?: string) {

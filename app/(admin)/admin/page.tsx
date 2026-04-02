@@ -1,14 +1,16 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { AdminDashboard } from "@/components/admin/AdminDashboard";
 
 export default async function AdminPage() {
-  const supabase = await createAdminClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const userClient = await createClient();
+  const { data: { user } } = await userClient.auth.getUser();
 
   if (!user || user.email !== process.env.ADMIN_EMAIL) {
     redirect("/dashboard");
   }
+
+  const supabase = createAdminClient();
 
   // Fetch all data in parallel
   const [{ data: clients }, { data: tickets }] = await Promise.all([

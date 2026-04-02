@@ -26,7 +26,7 @@ export async function getClientFiles() {
 
 export async function getDownloadUrl(storagePath: string) {
   // Use admin client for signed URL (private bucket)
-  const supabase = await createAdminClient();
+  const supabase = createAdminClient();
   const { data, error } = await supabase.storage
     .from("client-files")
     .createSignedUrl(storagePath, 3600);

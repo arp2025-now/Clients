@@ -1,4 +1,4 @@
-import { createAdminClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { getDecryptedCredentials } from "../../actions";
 import { ClientDetail } from "@/components/admin/ClientDetail";
@@ -10,12 +10,14 @@ export default async function ClientDetailPage({
 }) {
   const { id } = await params;
 
-  const supabase = await createAdminClient();
-  const { data: { user } } = await supabase.auth.getUser();
+  const userClient = await createClient();
+  const { data: { user } } = await userClient.auth.getUser();
 
   if (!user || user.email !== process.env.ADMIN_EMAIL) {
     redirect("/dashboard");
   }
+
+  const supabase = createAdminClient();
 
   const [{ data: client }, { data: projects }, { data: payments }, { data: files }, credentials] =
     await Promise.all([
