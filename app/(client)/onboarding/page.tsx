@@ -7,11 +7,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { saveBasicInfo, saveCredentials, saveCustomFields } from "./actions";
+import { saveBasicInfo, saveCredentials } from "./actions";
 
-const STEP_LABELS = ["פרטי עסק", "גישות מערכות", "פרטים נוספים", "סיום"];
-const TOTAL_STEPS = 4;
+const STEP_LABELS = ["פרטי עסק", "גישות מערכות", "סיום"];
+const TOTAL_STEPS = 3;
 
 type Credential = {
   system_name: string;
@@ -45,11 +44,6 @@ export default function OnboardingPage() {
   // Step 2 state
   const [credentials, setCredentials] = useState<Credential[]>([emptyCredential()]);
 
-  // Step 3 state
-  const [customFields, setCustomFields] = useState([
-    { field_name: "", field_value: "", field_type: "text" },
-  ]);
-
   async function handleStep1() {
     setLoading(true);
     setError("");
@@ -72,20 +66,6 @@ export default function OnboardingPage() {
       const filled = credentials.filter((c) => c.system_name.trim());
       if (filled.length > 0) await saveCredentials(filled);
       setStep(3);
-    } catch (e: unknown) {
-      setError((e as Error).message);
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  async function handleStep3() {
-    setLoading(true);
-    setError("");
-    try {
-      const filled = customFields.filter((f) => f.field_name.trim());
-      if (filled.length > 0) await saveCustomFields(filled);
-      setStep(4);
     } catch (e: unknown) {
       setError((e as Error).message);
     } finally {
@@ -142,7 +122,7 @@ export default function OnboardingPage() {
                   <Input
                     value={basicInfo.business_name}
                     onChange={(e) => setBasicInfo({ ...basicInfo, business_name: e.target.value })}
-                    placeholder="למשל: משרד עו״ד כהן"
+                    placeholder='למשל: משרד עו"ד כהן'
                     required
                   />
                 </div>
@@ -223,6 +203,7 @@ export default function OnboardingPage() {
                         <Label className="text-xs">שם משתמש / אימייל</Label>
                         <Input
                           dir="ltr"
+                          autoComplete="off"
                           value={cred.username}
                           onChange={(e) => updateCredential(i, "username", e.target.value)}
                           placeholder="user@email.com"
@@ -233,6 +214,7 @@ export default function OnboardingPage() {
                         <Input
                           dir="ltr"
                           type="password"
+                          autoComplete="new-password"
                           value={cred.password}
                           onChange={(e) => updateCredential(i, "password", e.target.value)}
                           placeholder="••••••••"
@@ -263,99 +245,29 @@ export default function OnboardingPage() {
                     onClick={handleStep2}
                     disabled={loading}
                   >
-                    {loading ? "שומרת..." : "המשך ←"}
-                  </Button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3 — Custom Fields */}
-            {step === 3 && (
-              <div className="space-y-4">
-                <CardHeader className="px-0 pt-0 pb-2">
-                  <h2 className="text-base font-bold">פרטים נוספים לפרויקט</h2>
-                  <p className="text-sm text-muted-foreground">
-                    שאלות ספציפיות מענת עבור הפרויקט שלך
-                  </p>
-                </CardHeader>
-
-                {customFields.map((field, i) => (
-                  <div key={i} className="space-y-2 bg-[oklch(0.08_0.04_296)] rounded-xl p-4 border border-border">
-                    <div className="space-y-1">
-                      <Label className="text-xs">שם השדה</Label>
-                      <Input
-                        value={field.field_name}
-                        onChange={(e) =>
-                          setCustomFields((prev) =>
-                            prev.map((f, idx) =>
-                              idx === i ? { ...f, field_name: e.target.value } : f
-                            )
-                          )
-                        }
-                        placeholder="למשל: מספר עובדים, תחום עיסוק..."
-                      />
-                    </div>
-                    <div className="space-y-1">
-                      <Label className="text-xs">תשובה</Label>
-                      <Textarea
-                        value={field.field_value}
-                        onChange={(e) =>
-                          setCustomFields((prev) =>
-                            prev.map((f, idx) =>
-                              idx === i ? { ...f, field_value: e.target.value } : f
-                            )
-                          )
-                        }
-                        rows={2}
-                        placeholder="..."
-                      />
-                    </div>
-                  </div>
-                ))}
-
-                <Button
-                  variant="outline"
-                  onClick={() =>
-                    setCustomFields([
-                      ...customFields,
-                      { field_name: "", field_value: "", field_type: "text" },
-                    ])
-                  }
-                  className="w-full"
-                >
-                  + הוסף שדה
-                </Button>
-
-                <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
-                    → חזרה
-                  </Button>
-                  <Button
-                    className="flex-1 ap-gradient text-white"
-                    onClick={handleStep3}
-                    disabled={loading}
-                  >
                     {loading ? "שומרת..." : "סיום ←"}
                   </Button>
                 </div>
               </div>
             )}
 
-            {/* Step 4 — Done */}
-            {step === 4 && (
-              <div className="text-center py-6 space-y-4">
-                <div className="w-16 h-16 rounded-full ap-gradient flex items-center justify-center text-3xl mx-auto ap-glow">
+            {/* Step 3 — Done */}
+            {step === 3 && (
+              <div className="text-center py-8 space-y-5">
+                <div className="w-20 h-20 rounded-full ap-gradient flex items-center justify-center text-4xl mx-auto ap-glow">
                   ✓
                 </div>
-                <h2 className="text-xl font-bold">תודה! הטופס הושלם</h2>
-                <p className="text-muted-foreground text-sm max-w-xs mx-auto">
-                  ענת תקבל עדכון ותיצור קשר בהקדם להתחלת הפרויקט.
-                </p>
+                <div className="space-y-2">
+                  <h2 className="text-xl font-bold">תודה! הטופס הושלם</h2>
+                  <p className="text-muted-foreground text-sm max-w-xs mx-auto">
+                    ענת תקבל עדכון ותיצור קשר בהקדם להתחלת הפרויקט.
+                  </p>
+                </div>
                 <Button
                   className="ap-gradient text-white px-8"
                   onClick={() => router.push("/dashboard")}
                 >
-                  עבר לדשבורד ←
+                  עבור לדשבורד ←
                 </Button>
               </div>
             )}

@@ -14,6 +14,24 @@ const PAYMENT_BADGE: Record<string, { label: string; class: string }> = {
   overdue: { label: "באיחור", class: "bg-red-500/15 text-red-400 border-red-500/20" },
 };
 
+const CLIENT_STATUS_STYLES: Record<string, string> = {
+  onboarding: "border-r-[#1CA9C9]",
+  active:     "border-r-green-500",
+  paused:     "border-r-yellow-500",
+};
+
+const CLIENT_STATUS_LABELS: Record<string, string> = {
+  onboarding: "קליטה",
+  active:     "פעיל",
+  paused:     "מושהה",
+};
+
+const CLIENT_STATUS_BADGE: Record<string, string> = {
+  onboarding: "bg-[rgba(28,169,201,0.15)] text-[#1CA9C9] border-[#1CA9C9]/30",
+  active:     "bg-green-500/15 text-green-400 border-green-500/20",
+  paused:     "bg-yellow-500/15 text-yellow-400 border-yellow-500/20",
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export function AdminDashboard({ clients, openTickets }: { clients: any[]; openTickets: any[] }) {
   const router = useRouter();
@@ -92,17 +110,24 @@ export function AdminDashboard({ clients, openTickets }: { clients: any[]; openT
                 (t: { status: string }) => ["open", "in_progress"].includes(t.status)
               ).length ?? 0;
 
+              const clientStatus = client.status ?? "onboarding";
+
               return (
                 <Link
                   key={client.id}
                   href={`/admin/clients/${client.id}`}
-                  className="bg-card border border-border rounded-xl p-4 space-y-3 hover:border-[#1CA9C9]/40 transition-colors block"
+                  className={`bg-card border border-border border-r-2 rounded-xl p-4 space-y-3 hover:border-[#1CA9C9]/40 transition-colors block ${CLIENT_STATUS_STYLES[clientStatus]}`}
                 >
                   <div className="flex items-start justify-between gap-2">
                     <span className="font-bold text-sm leading-tight">{client.business_name}</span>
-                    <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${payBadge.class}`}>
-                      {payBadge.label}
-                    </Badge>
+                    <div className="flex gap-1.5 flex-shrink-0">
+                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${CLIENT_STATUS_BADGE[clientStatus]}`}>
+                        {CLIENT_STATUS_LABELS[clientStatus]}
+                      </Badge>
+                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${payBadge.class}`}>
+                        {payBadge.label}
+                      </Badge>
+                    </div>
                   </div>
                   <div className="flex gap-4 text-xs text-muted-foreground">
                     <span>{client.projects?.length ?? 0} פרויקטים</span>

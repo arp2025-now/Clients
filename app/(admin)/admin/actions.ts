@@ -90,3 +90,90 @@ export async function getDecryptedCredentials(clientId: string) {
     password: cred.encrypted_password ? decrypt(cred.encrypted_password) : null,
   }));
 }
+
+// ============================================================
+// CLIENT STATUS & NOTES
+// ============================================================
+
+export async function updateClientStatus(clientId: string, status: string) {
+  const supabase = await requireAdmin();
+  const { error } = await supabase
+    .from("clients")
+    .update({ status })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/clients/${clientId}`);
+  revalidatePath("/admin");
+}
+
+export async function updateClientNotes(clientId: string, notes: string) {
+  const supabase = await requireAdmin();
+  const { error } = await supabase
+    .from("clients")
+    .update({ admin_notes: notes })
+    .eq("id", clientId);
+  if (error) throw new Error(error.message);
+}
+
+// ============================================================
+// FILE MANAGEMENT
+// ============================================================
+
+export async function uploadClientFile(
+  clientId: string,
+  filename: string,
+  fileBase64: string,
+  mimeType: string,
+  fileType: "contract" | "spec" | "other",
+  sizeBytes: number
+) {
+  const supabase = await requireAdmin();
+
+  // Decode base64 to buffer
+  const buffer = Buffer.from(fileBase64, "base64");
+  const storagePath = `${clientId}/${Date.now()}_${filename}`;
+
+  const { error: uploadError } = await supabase.storage
+    .from("client-files")
+    .upload(storagePath, buffer, {
+      contentType: mimeType,
+      upsert: false,
+    });
+
+  if (uploadError) throw new Error(uploadError.message);
+
+  const { error: dbError } = await supabase
+    .from("client_files")
+    .insert({ client_id: clientId, filename, storage_path: storagePath, file_type: fileType, size_bytes: sizeBytes });
+
+  if (dbError) {
+    // Rollback storage upload
+    await supabase.storage.from("client-files").remove([storagePath]);
+    throw new Error(dbError.message);
+  }
+
+  revalidatePath(`/admin/clients/${clientId}`);
+}
+
+export async function deleteClientFile(fileId: string, storagePath: string, clientId: string) {
+  const supabase = await requireAdmin();
+
+  await supabase.storage.from("client-files").remove([storagePath]);
+
+  const { error } = await supabase
+    .from("client_files")
+    .delete()
+    .eq("id", fileId);
+
+  if (error) throw new Error(error.message);
+  revalidatePath(`/admin/clients/${clientId}`);
+}
+
+export async function getSignedDownloadUrl(storagePath: string) {
+  const supabase = await requireAdmin();
+  const { data, error } = await supabase.storage
+    .from("client-files")
+    .createSignedUrl(storagePath, 3600); // 1 hour
+  if (error) throw new Error(error.message);
+  return data.signedUrl;
+}

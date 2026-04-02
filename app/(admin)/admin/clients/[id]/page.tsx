@@ -17,12 +17,12 @@ export default async function ClientDetailPage({
     redirect("/dashboard");
   }
 
-  const [{ data: client }, { data: projects }, { data: payments }, { data: customFields }, credentials] =
+  const [{ data: client }, { data: projects }, { data: payments }, { data: files }, credentials] =
     await Promise.all([
       supabase.from("clients").select("*").eq("id", id).single(),
       supabase.from("projects").select("*").eq("client_id", id).order("created_at"),
       supabase.from("payments").select("*").eq("client_id", id).order("created_at"),
-      supabase.from("onboarding_custom_fields").select("*").eq("client_id", id).order("sort_order"),
+      supabase.from("client_files").select("*").eq("client_id", id).order("uploaded_at", { ascending: false }),
       getDecryptedCredentials(id),
     ]);
 
@@ -33,7 +33,7 @@ export default async function ClientDetailPage({
       client={client}
       projects={projects ?? []}
       payments={payments ?? []}
-      customFields={customFields ?? []}
+      files={files ?? []}
       credentials={credentials}
     />
   );
