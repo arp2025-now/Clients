@@ -129,7 +129,14 @@ export async function uploadClientFile(formData: FormData): Promise<{ error: str
 
   if (!file || !clientId) return { error: "Missing file or clientId" };
 
-  const storagePath = `${clientId}/${Date.now()}_${file.name}`;
+  // Sanitize filename for storage path (keep original name for display)
+  const ext = file.name.split(".").pop() ?? "";
+  const safeName = file.name
+    .replace(/\.[^.]+$/, "") // remove extension
+    .replace(/[^\w\-]/g, "_") // replace non-ASCII (Hebrew, spaces, etc.) with _
+    .replace(/_+/g, "_") // collapse consecutive underscores
+    .slice(0, 60); // limit length
+  const storagePath = `${clientId}/${Date.now()}_${safeName}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("client-files")
