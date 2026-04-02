@@ -110,10 +110,14 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
       formData.append("file", file);
       formData.append("clientId", client.id);
       formData.append("fileType", uploadFileType);
-      await uploadClientFile(formData);
-      router.refresh();
+      const result = await uploadClientFile(formData);
+      if (result.error) {
+        alert("שגיאה בהעלאת הקובץ: " + result.error);
+      } else {
+        router.refresh();
+      }
     } catch (err) {
-      alert("שגיאה בהעלאת הקובץ: " + (err instanceof Error ? err.message : String(err)));
+      alert("שגיאה: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
@@ -169,9 +173,10 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
         </div>
       </div>
 
-      <div className="p-6 space-y-8 max-w-5xl">
-        {/* Client header */}
-        <div className="flex items-start justify-between">
+      <div className="p-6 space-y-6 max-w-5xl">
+        {/* Client header card */}
+        <div className="rounded-2xl p-5 flex items-start justify-between gap-4"
+          style={{ background: "linear-gradient(135deg, rgba(28,169,201,0.10) 0%, rgba(66,152,166,0.06) 100%)", border: "1px solid rgba(28,169,201,0.2)" }}>
           <div>
             <h1 className="text-3xl font-black">{client.business_name}</h1>
             <div className="flex gap-4 text-sm text-muted-foreground mt-2">
@@ -183,7 +188,7 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
               )}
             </div>
           </div>
-          <Badge variant="outline" className={`text-sm px-3 py-1 ${CLIENT_STATUS_STYLES[clientStatus]}`}>
+          <Badge variant="outline" className={`text-sm px-3 py-1 flex-shrink-0 ${CLIENT_STATUS_STYLES[clientStatus]}`}>
             {CLIENT_STATUS_LABELS[clientStatus]}
           </Badge>
         </div>
@@ -191,11 +196,10 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
         {/* Projects + Payments */}
         <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
           {/* Projects */}
-          <section className="space-y-3">
+          <section className="bg-card rounded-2xl border-t-2 border-t-[#1CA9C9] border border-border p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <span className="w-1 h-4 rounded-full ap-gradient inline-block" />
-                פרויקטים
+              <h2 className="text-sm font-bold flex items-center gap-2 text-[#1CA9C9]">
+                📁 פרויקטים
               </h2>
               <button onClick={() => setAddingProject(!addingProject)} className="text-xs text-[#1CA9C9] hover:underline">
                 + הוסף
@@ -250,11 +254,10 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
           </section>
 
           {/* Payments */}
-          <section className="space-y-3">
+          <section className="bg-card rounded-2xl border-t-2 border-t-green-500 border border-border p-4 space-y-3">
             <div className="flex items-center justify-between">
-              <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-                <span className="w-1 h-4 rounded-full bg-green-500 inline-block" />
-                תשלומים
+              <h2 className="text-sm font-bold flex items-center gap-2 text-green-400">
+                💰 תשלומים
               </h2>
               <button onClick={() => setAddingPayment(!addingPayment)} className="text-xs text-[#1CA9C9] hover:underline">
                 + הוסף
@@ -306,10 +309,9 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
         </div>
 
         {/* Credentials */}
-        <section className="space-y-3">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-[#1CA9C9] inline-block" />
-            גישות מערכות 🔓
+        <section className="bg-card rounded-2xl border-t-2 border-t-violet-500 border border-border p-4 space-y-3">
+          <h2 className="text-sm font-bold flex items-center gap-2 text-violet-400">
+            🔐 גישות מערכות
           </h2>
           {credentials.length === 0 ? (
             <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">הלקוח טרם מילא גישות</p>
@@ -354,11 +356,10 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
         </section>
 
         {/* Files */}
-        <section className="space-y-3">
+        <section className="bg-card rounded-2xl border-t-2 border-t-purple-500 border border-border p-4 space-y-3">
           <div className="flex items-center justify-between">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-              <span className="w-1 h-4 rounded-full bg-purple-500 inline-block" />
-              קבצים ומסמכים
+            <h2 className="text-sm font-bold flex items-center gap-2 text-purple-400">
+              📎 קבצים ומסמכים
             </h2>
             <div className="flex items-center gap-2">
               <select
@@ -437,10 +438,9 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
         </section>
 
         {/* Admin Notes */}
-        <section className="space-y-3 pb-8">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-yellow-500 inline-block" />
-            הערות פנימיות
+        <section className="bg-card rounded-2xl border-t-2 border-t-yellow-500 border border-border p-4 space-y-3 pb-8">
+          <h2 className="text-sm font-bold flex items-center gap-2 text-yellow-400">
+            📝 הערות פנימיות
             <span className="text-[10px] normal-case font-normal text-muted-foreground">(גלויות לך בלבד)</span>
           </h2>
           <Textarea

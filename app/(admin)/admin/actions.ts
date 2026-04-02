@@ -119,14 +119,14 @@ export async function updateClientNotes(clientId: string, notes: string) {
 // FILE MANAGEMENT
 // ============================================================
 
-export async function uploadClientFile(formData: FormData) {
+export async function uploadClientFile(formData: FormData): Promise<{ error: string | null }> {
   const supabase = await requireAdmin();
 
   const file = formData.get("file") as File;
   const clientId = formData.get("clientId") as string;
   const fileType = formData.get("fileType") as string;
 
-  if (!file || !clientId) throw new Error("Missing file or clientId");
+  if (!file || !clientId) return { error: "Missing file or clientId" };
 
   const storagePath = `${clientId}/${Date.now()}_${file.name}`;
 
@@ -137,7 +137,7 @@ export async function uploadClientFile(formData: FormData) {
       upsert: false,
     });
 
-  if (uploadError) throw new Error(uploadError.message);
+  if (uploadError) return { error: `Storage: ${uploadError.message}` };
 
   const { error: dbError } = await supabase
     .from("client_files")
@@ -145,10 +145,11 @@ export async function uploadClientFile(formData: FormData) {
 
   if (dbError) {
     await supabase.storage.from("client-files").remove([storagePath]);
-    throw new Error(dbError.message);
+    return { error: `DB: ${dbError.message}` };
   }
 
   revalidatePath(`/admin/clients/${clientId}`);
+  return { error: null };
 }
 
 export async function deleteClientFile(fileId: string, storagePath: string, clientId: string) {
