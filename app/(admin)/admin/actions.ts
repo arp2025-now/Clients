@@ -128,12 +128,11 @@ export async function uploadClientFile(formData: FormData) {
 
   if (!file || !clientId) throw new Error("Missing file or clientId");
 
-  const bytes = await file.arrayBuffer();
   const storagePath = `${clientId}/${Date.now()}_${file.name}`;
 
   const { error: uploadError } = await supabase.storage
     .from("client-files")
-    .upload(storagePath, bytes, {
+    .upload(storagePath, file, {
       contentType: file.type,
       upsert: false,
     });

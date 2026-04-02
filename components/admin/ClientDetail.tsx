@@ -112,8 +112,8 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
       formData.append("fileType", uploadFileType);
       await uploadClientFile(formData);
       router.refresh();
-    } catch {
-      alert("שגיאה בהעלאת הקובץ");
+    } catch (err) {
+      alert("שגיאה בהעלאת הקובץ: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
