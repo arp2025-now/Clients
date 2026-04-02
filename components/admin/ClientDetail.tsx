@@ -106,13 +106,11 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
     if (!file) return;
     setUploading(true);
     try {
-      const base64 = await new Promise<string>((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = () => resolve((reader.result as string).split(",")[1]);
-        reader.onerror = reject;
-        reader.readAsDataURL(file);
-      });
-      await uploadClientFile(client.id, file.name, base64, file.type, uploadFileType, file.size);
+      const formData = new FormData();
+      formData.append("file", file);
+      formData.append("clientId", client.id);
+      formData.append("fileType", uploadFileType);
+      await uploadClientFile(formData);
       router.refresh();
     } catch {
       alert("שגיאה בהעלאת הקובץ");

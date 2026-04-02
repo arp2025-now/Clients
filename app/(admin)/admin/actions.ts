@@ -119,24 +119,22 @@ export async function updateClientNotes(clientId: string, notes: string) {
 // FILE MANAGEMENT
 // ============================================================
 
-export async function uploadClientFile(
-  clientId: string,
-  filename: string,
-  fileBase64: string,
-  mimeType: string,
-  fileType: "contract" | "spec" | "other",
-  sizeBytes: number
-) {
+export async function uploadClientFile(formData: FormData) {
   const supabase = await requireAdmin();
 
-  // Decode base64 to buffer
-  const buffer = Buffer.from(fileBase64, "base64");
-  const storagePath = `${clientId}/${Date.now()}_${filename}`;
+  const file = formData.get("file") as File;
+  const clientId = formData.get("clientId") as string;
+  const fileType = formData.get("fileType") as string;
+
+  if (!file || !clientId) throw new Error("Missing file or clientId");
+
+  const bytes = await file.arrayBuffer();
+  const storagePath = `${clientId}/${Date.now()}_${file.name}`;
 
   const { error: uploadError } = await supabase.storage
     .from("client-files")
-    .upload(storagePath, buffer, {
-      contentType: mimeType,
+    .upload(storagePath, bytes, {
+      contentType: file.type,
       upsert: false,
     });
 
@@ -144,10 +142,9 @@ export async function uploadClientFile(
 
   const { error: dbError } = await supabase
     .from("client_files")
-    .insert({ client_id: clientId, filename, storage_path: storagePath, file_type: fileType, size_bytes: sizeBytes });
+    .insert({ client_id: clientId, filename: file.name, storage_path: storagePath, file_type: fileType, size_bytes: file.size });
 
   if (dbError) {
-    // Rollback storage upload
     await supabase.storage.from("client-files").remove([storagePath]);
     throw new Error(dbError.message);
   }
