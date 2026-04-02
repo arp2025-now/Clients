@@ -27,27 +27,38 @@ export default async function DashboardPage() {
     <div className="flex h-full">
       {/* CENTER — projects + tickets */}
       <div className="flex-1 p-6 space-y-6 overflow-y-auto">
-        {/* Greeting */}
-        <div>
-          <h1 className="text-xl font-bold">
-            שלום, {client?.business_name ?? "לקוח"} 👋
-          </h1>
-          <p className="text-sm text-muted-foreground mt-0.5">
-            הנה סיכום הפרויקטים שלך
-          </p>
+        {/* Welcome banner */}
+        <div className="relative overflow-hidden rounded-2xl p-5 space-y-1"
+          style={{ background: "linear-gradient(135deg, rgba(28,169,201,0.12) 0%, rgba(66,152,166,0.08) 100%)", border: "1px solid rgba(28,169,201,0.2)" }}>
+          <div className="flex items-center justify-between">
+            <div>
+              <h1 className="text-xl font-black">
+                שלום, {client?.business_name ?? "לקוח"} 👋
+              </h1>
+              <p className="text-sm text-muted-foreground mt-0.5">
+                ברוכים הבאים לפורטל הלקוחות של AP Automations
+              </p>
+            </div>
+            <div className="w-10 h-10 rounded-xl ap-gradient flex items-center justify-center text-white font-black text-sm flex-shrink-0">
+              AP
+            </div>
+          </div>
         </div>
 
         {/* Projects */}
         <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+            <span className="w-1 h-4 rounded-full ap-gradient inline-block" />
             פרויקטים פעילים
           </h2>
           {projects && projects.length > 0 ? (
             <div className="space-y-3">
-              {projects.map((project) => (
+              {projects.map((project) => {
+                const borderColor = project.status === "live" ? "border-r-green-500" : project.status === "testing" ? "border-r-orange-400" : "border-r-[#1CA9C9]";
+                return (
                 <div
                   key={project.id}
-                  className="bg-card border border-border rounded-xl p-4 space-y-2"
+                  className={`bg-card border border-border border-r-2 ${borderColor} rounded-xl p-4 space-y-2 hover:border-[#1CA9C9]/30 transition-colors`}
                 >
                   <div className="flex items-center justify-between gap-3">
                     <span className="font-semibold text-sm">{project.name}</span>
@@ -63,7 +74,8 @@ export default async function DashboardPage() {
                     </span>
                   </div>
                 </div>
-              ))}
+                );
+              })}
             </div>
           ) : (
             <div className="bg-card border border-border rounded-xl p-6 text-center text-muted-foreground text-sm">
@@ -114,30 +126,32 @@ export default async function DashboardPage() {
       </div>
 
       {/* RIGHT PANEL — progress */}
-      <div className="w-52 border-r border-border p-4 space-y-4 overflow-y-auto hidden md:block">
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+      <div className="w-56 border-r border-border p-4 space-y-4 overflow-y-auto hidden md:block">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+          <span className="w-1 h-3 rounded-full ap-gradient inline-block" />
           התקדמות
         </h2>
 
-        <div className="bg-card border border-border rounded-xl p-4 text-center space-y-3">
-          <div className="text-4xl font-black ap-gradient-text">{avgProgress}%</div>
+        <div className="rounded-2xl p-5 text-center space-y-3"
+          style={{ background: "linear-gradient(135deg, rgba(28,169,201,0.1) 0%, rgba(66,152,166,0.06) 100%)", border: "1px solid rgba(28,169,201,0.2)" }}>
+          <div className="text-5xl font-black ap-gradient-text leading-none">{avgProgress}%</div>
           <Progress value={avgProgress} className="h-2" />
           <p className="text-xs text-muted-foreground">
-            {liveCount} מתוך {projects?.length ?? 0} פרויקטים Live
+            {liveCount}/{projects?.length ?? 0} פרויקטים Live
           </p>
         </div>
 
         {/* Quick stats */}
         <div className="space-y-2">
-          <div className="bg-card border border-border rounded-xl p-3">
+          <div className="bg-card border border-border rounded-xl p-3 hover:border-yellow-500/20 transition-colors">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">טיקטים פתוחים</p>
-            <p className="text-2xl font-bold mt-1" style={{ color: tickets && tickets.length > 0 ? "#eab308" : "#22c55e" }}>
+            <p className="text-2xl font-black mt-1" style={{ color: tickets && tickets.length > 0 ? "#eab308" : "#22c55e" }}>
               {tickets?.length ?? 0}
             </p>
           </div>
-          <div className="bg-card border border-border rounded-xl p-3">
+          <div className="bg-card border border-border rounded-xl p-3 hover:border-[#1CA9C9]/20 transition-colors">
             <p className="text-[10px] uppercase tracking-wider text-muted-foreground">פרויקטים</p>
-            <p className="text-2xl font-bold mt-1 text-[#1CA9C9]">
+            <p className="text-2xl font-black mt-1 text-[#1CA9C9]">
               {projects?.length ?? 0}
             </p>
           </div>

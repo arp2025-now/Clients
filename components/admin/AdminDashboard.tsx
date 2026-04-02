@@ -63,39 +63,62 @@ export function AdminDashboard({ clients, openTickets }: { clients: any[]; openT
     router.refresh();
   }
 
+  const activeCount = clients.filter((c) => c.status === "active").length;
+  const totalOpenTickets = openTickets.length;
+
   return (
     <div className="p-6 space-y-8 max-w-5xl">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex items-start justify-between gap-6">
         <div>
-          <h1 className="text-2xl font-black ap-gradient-text">Admin Dashboard</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">AP Automations — לוח בקרה פנימי</p>
+          <h1 className="text-2xl font-black ap-gradient-text">AP Automations</h1>
+          <p className="text-sm text-muted-foreground mt-0.5">לוח בקרה פנימי</p>
         </div>
-        {/* Invite form */}
-        <form onSubmit={handleInvite} className="flex gap-2 items-center">
-          <input
-            type="email"
-            value={inviteEmail}
-            onChange={(e) => setInviteEmail(e.target.value)}
-            placeholder="אימייל לקוח חדש"
-            dir="ltr"
-            className="bg-input border border-border rounded-lg px-3 py-2 text-sm w-48 outline-none focus:border-[#1CA9C9]"
-            required
-          />
-          <Button type="submit" className="ap-gradient text-white text-sm" disabled={inviteLoading}>
-            {inviteLoading ? "שולח..." : "הזמן לקוח"}
-          </Button>
-        </form>
+        {/* Invite form — card style */}
+        <div className="bg-card border border-border rounded-xl p-4 space-y-3 w-72 flex-shrink-0">
+          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">הזמנת לקוח חדש</p>
+          <form onSubmit={handleInvite} className="flex gap-2">
+            <input
+              type="email"
+              value={inviteEmail}
+              onChange={(e) => setInviteEmail(e.target.value)}
+              placeholder="אימייל"
+              dir="ltr"
+              className="bg-input border border-border rounded-lg px-3 py-2 text-sm flex-1 outline-none focus:border-[#1CA9C9] transition-colors"
+              required
+            />
+            <Button type="submit" className="ap-gradient text-white text-sm px-4" disabled={inviteLoading}>
+              {inviteLoading ? "..." : "שלח"}
+            </Button>
+          </form>
+          {inviteMsg && (
+            <p className={`text-xs ${inviteMsg.startsWith("✓") ? "text-green-400" : "text-red-400"}`}>
+              {inviteMsg}
+            </p>
+          )}
+        </div>
       </div>
-      {inviteMsg && (
-        <p className={`text-sm ${inviteMsg.startsWith("✓") ? "text-green-400" : "text-red-400"}`}>
-          {inviteMsg}
-        </p>
-      )}
+
+      {/* Stats bar */}
+      <div className="grid grid-cols-3 gap-4">
+        <div className="bg-card border border-border rounded-xl p-4 space-y-1">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">סה״כ לקוחות</p>
+          <p className="text-3xl font-black text-foreground">{clients.length}</p>
+        </div>
+        <div className="bg-card border border-[#1CA9C9]/20 rounded-xl p-4 space-y-1">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">לקוחות פעילים</p>
+          <p className="text-3xl font-black text-[#1CA9C9]">{activeCount}</p>
+        </div>
+        <div className={`bg-card border rounded-xl p-4 space-y-1 ${totalOpenTickets > 0 ? "border-yellow-500/20" : "border-green-500/20"}`}>
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">טיקטים פתוחים</p>
+          <p className={`text-3xl font-black ${totalOpenTickets > 0 ? "text-yellow-400" : "text-green-400"}`}>{totalOpenTickets}</p>
+        </div>
+      </div>
 
       {/* Clients grid */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+          <span className="w-1 h-4 rounded-full ap-gradient inline-block" />
           לקוחות ({clients.length})
         </h2>
         {clients.length === 0 ? (
@@ -149,7 +172,8 @@ export function AdminDashboard({ clients, openTickets }: { clients: any[]; openT
 
       {/* Open tickets */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4">
+        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+          <span className="w-1 h-4 rounded-full bg-yellow-500 inline-block" />
           טיקטים פתוחים ({openTickets.length})
         </h2>
         {openTickets.length === 0 ? (
