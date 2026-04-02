@@ -22,7 +22,7 @@ export function DashboardSidebar() {
   }
 
   return (
-    <aside className="w-14 flex flex-col items-center py-4 gap-3 bg-[oklch(0.08_0.04_296)] border-l border-border">
+    <aside className="w-14 flex flex-col items-center py-4 gap-3 bg-sidebar border-l border-border shadow-sm">
       {/* Logo */}
       <div className="w-8 h-8 rounded-lg ap-gradient flex items-center justify-center text-white font-black text-xs mb-2">
         AP

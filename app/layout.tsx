@@ -20,7 +20,7 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="he" dir="rtl" className="dark h-full">
+    <html lang="he" dir="rtl" className="h-full">
       <body className={`${heebo.className} min-h-full antialiased bg-background text-foreground`}>
         <TooltipProvider>
           {children}
