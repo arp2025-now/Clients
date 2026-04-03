@@ -36,9 +36,14 @@ export default function LoginPage() {
       return;
     }
 
-    const redirect = await getLoginRedirect();
-    router.push(redirect);
-    router.refresh();
+    try {
+      const redirect = await getLoginRedirect();
+      router.push(redirect);
+      router.refresh();
+    } catch {
+      setError("שגיאה בכניסה. נסי שוב.");
+      setLoading(false);
+    }
   }
 
   async function handleForgot(e: React.FormEvent) {
@@ -58,7 +63,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-content-center bg-background px-4">
+    <div className="min-h-screen flex items-center justify-center bg-background px-4">
       <div className="w-full max-w-sm mx-auto">
         {/* Logo */}
         <div className="text-center mb-8">
