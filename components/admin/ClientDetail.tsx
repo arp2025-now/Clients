@@ -462,15 +462,20 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
     }
     setPaymentSaving(true);
     setPaymentError(null);
-    const result = await addPayment(client.id, amt, paymentForm.status, paymentForm.due_date || undefined, paymentForm.notes || undefined);
-    setPaymentSaving(false);
-    if (result.error) {
-      setPaymentError(result.error);
-      return;
+    try {
+      const result = await addPayment(client.id, amt, paymentForm.status, paymentForm.due_date || undefined, paymentForm.notes || undefined);
+      if (result?.error) {
+        setPaymentError(result.error);
+        return;
+      }
+      setPaymentForm({ amount: "", status: "pending", due_date: "", notes: "" });
+      setAddingPayment(false);
+      router.refresh();
+    } catch (e: unknown) {
+      setPaymentError((e as Error).message ?? "שגיאה בשמירה");
+    } finally {
+      setPaymentSaving(false);
     }
-    setPaymentForm({ amount: "", status: "pending", due_date: "", notes: "" });
-    setAddingPayment(false);
-    router.refresh();
   }
 
   async function handleStatusChange(newStatus: string) {
