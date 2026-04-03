@@ -233,7 +233,7 @@ export default function OnboardingPage() {
                 </CardHeader>
 
                 {credentials.map((cred, i) => (
-                  <div key={i} className="bg-[oklch(0.08_0.04_296)] rounded-xl p-4 space-y-3 border border-border">
+                  <div key={i} className="bg-muted/40 rounded-xl p-4 space-y-3 border border-border">
                     <div className="flex items-center justify-between">
                       <span className="text-sm font-semibold text-[#1CA9C9]">
                         מערכת {i + 1}

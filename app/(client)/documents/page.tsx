@@ -9,7 +9,7 @@ export default async function DocumentsPage() {
       <div>
         <h1 className="text-xl font-bold">המסמכים שלי</h1>
         <p className="text-sm text-muted-foreground mt-0.5">
-          קבצים ומסמכים שענת העלתה עבורך
+          חוזים, מסמכים וקבצים הקשורים לפרויקט
         </p>
       </div>
       <DocumentsList files={files} />
