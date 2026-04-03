@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { getLoginRedirect } from "./actions";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -35,9 +36,8 @@ export default function LoginPage() {
       return;
     }
 
-    const { data: { user } } = await supabase.auth.getUser();
-    const isAdmin = user?.email === process.env.NEXT_PUBLIC_ADMIN_EMAIL;
-    router.push(isAdmin ? "/admin" : "/dashboard");
+    const redirect = await getLoginRedirect();
+    router.push(redirect);
     router.refresh();
   }
 
