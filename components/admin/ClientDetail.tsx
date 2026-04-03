@@ -455,18 +455,22 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
   }
 
   async function handleAddPayment() {
+    const amt = parseFloat(paymentForm.amount);
+    if (isNaN(amt) || amt <= 0) {
+      setPaymentError("נא להזין סכום תקין");
+      return;
+    }
     setPaymentSaving(true);
     setPaymentError(null);
-    try {
-      await addPayment(client.id, parseFloat(paymentForm.amount), paymentForm.status, paymentForm.due_date, paymentForm.notes);
-      setPaymentForm({ amount: "", status: "pending", due_date: "", notes: "" });
-      setAddingPayment(false);
-      router.refresh();
-    } catch (e: unknown) {
-      setPaymentError((e as Error).message);
-    } finally {
-      setPaymentSaving(false);
+    const result = await addPayment(client.id, amt, paymentForm.status, paymentForm.due_date || undefined, paymentForm.notes || undefined);
+    setPaymentSaving(false);
+    if (result.error) {
+      setPaymentError(result.error);
+      return;
     }
+    setPaymentForm({ amount: "", status: "pending", due_date: "", notes: "" });
+    setAddingPayment(false);
+    router.refresh();
   }
 
   async function handleStatusChange(newStatus: string) {

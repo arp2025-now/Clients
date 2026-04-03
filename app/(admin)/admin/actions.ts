@@ -65,13 +65,24 @@ export async function addProject(clientId: string, name: string, description: st
   revalidatePath("/admin");
 }
 
-export async function addPayment(clientId: string, amount: number, status: string, dueDate?: string, notes?: string) {
-  const supabase = await requireAdmin();
-  const { error } = await supabase
-    .from("payments")
-    .insert({ client_id: clientId, amount, status, due_date: dueDate || null, notes });
-  if (error) throw new Error(error.message);
-  revalidatePath(`/admin/clients/${clientId}`);
+export async function addPayment(clientId: string, amount: number, status: string, dueDate?: string, notes?: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await requireAdmin();
+    const { error } = await supabase
+      .from("payments")
+      .insert({
+        client_id: clientId,
+        amount,
+        status,
+        due_date: dueDate || null,
+        notes: notes || null,
+      });
+    if (error) return { error: error.message };
+    revalidatePath(`/admin/clients/${clientId}`);
+    return { error: null };
+  } catch (e: unknown) {
+    return { error: (e as Error).message };
+  }
 }
 
 // Returns decrypted credentials — server-only
