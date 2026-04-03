@@ -652,7 +652,7 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
                     {paymentError && <p className="text-xs text-red-400">{paymentError}</p>}
                     <div className="flex gap-2">
                       <Button variant="outline" size="sm" onClick={() => { setAddingPayment(false); setPaymentError(null); }}>ביטול</Button>
-                      <Button className="ap-gradient text-white" size="sm" onClick={handleAddPayment} disabled={paymentSaving || !paymentForm.amount}>
+                      <Button className="ap-gradient text-white" size="sm" onClick={handleAddPayment} disabled={paymentSaving}>
                         {paymentSaving ? "שומר..." : "הוסף"}
                       </Button>
                     </div>
