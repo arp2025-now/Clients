@@ -52,7 +52,7 @@ export async function uploadClientDocument(formData: FormData): Promise<{ error:
       .upload(storagePath, file, { upsert: false });
     if (uploadError) return { error: uploadError.message };
 
-    const { error: dbError } = await supabase.from("client_files").insert({
+    const { error: dbError } = await admin.from("client_files").insert({
       client_id: client.id,
       filename: file.name,
       storage_path: storagePath,
