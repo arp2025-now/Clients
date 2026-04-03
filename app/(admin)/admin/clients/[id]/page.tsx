@@ -1,6 +1,6 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
-import { getDecryptedCredentials } from "../../actions";
+import { getDecryptedCredentials, getAuditLog } from "../../actions";
 import { ClientDetail } from "@/components/admin/ClientDetail";
 
 export default async function ClientDetailPage({
@@ -19,13 +19,15 @@ export default async function ClientDetailPage({
 
   const supabase = createAdminClient();
 
-  const [{ data: client }, { data: projects }, { data: payments }, { data: files }, credentials] =
+  const [{ data: client }, { data: projects }, { data: payments }, { data: files }, { data: tickets }, credentials, auditLog] =
     await Promise.all([
       supabase.from("clients").select("*").eq("id", id).single(),
       supabase.from("projects").select("*").eq("client_id", id).order("created_at"),
       supabase.from("payments").select("*").eq("client_id", id).order("created_at"),
       supabase.from("client_files").select("*").eq("client_id", id).order("uploaded_at", { ascending: false }),
+      supabase.from("tickets").select("*").eq("client_id", id).order("created_at", { ascending: false }),
       getDecryptedCredentials(id),
+      getAuditLog(id),
     ]);
 
   if (!client) redirect("/admin");
@@ -37,6 +39,8 @@ export default async function ClientDetailPage({
       payments={payments ?? []}
       files={files ?? []}
       credentials={credentials}
+      tickets={tickets ?? []}
+      auditLog={auditLog}
     />
   );
 }

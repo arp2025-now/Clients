@@ -19,6 +19,10 @@ import {
   uploadClientFile,
   deleteClientFile,
   getSignedDownloadUrl,
+  getTicketComments,
+  addAdminTicketComment,
+  uploadProjectImage,
+  updateTicketStatusWithAudit,
 } from "@/app/(admin)/admin/actions";
 
 const PAYMENT_BADGE: Record<string, string> = {
@@ -51,14 +55,229 @@ const FILE_TYPE_STYLES: Record<string, string> = {
   other:    "bg-gray-500/15 text-gray-400 border-gray-500/20",
 };
 
+const TICKET_STATUS_LABELS: Record<string, string> = {
+  open: "פתוח",
+  in_progress: "בטיפול",
+  resolved: "נפתר",
+  closed: "סגור",
+};
+
 function formatBytes(bytes: number) {
   if (bytes < 1024) return `${bytes} B`;
   if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(0)} KB`;
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "עכשיו";
+  if (mins < 60) return `לפני ${mins} דקות`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `לפני ${hours} שעות`;
+  return `לפני ${Math.floor(hours / 24)} ימים`;
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  created: "נוצר",
+  updated: "עודכן",
+  status_changed: "שונה סטטוס",
+  commented: "הוסף תגובה",
+  uploaded: "הועלה קובץ",
+};
+const ENTITY_LABELS: Record<string, string> = {
+  ticket: "טיקט",
+  project: "פרויקט",
+  payment: "תשלום",
+  file: "קובץ",
+  comment: "הערה",
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function ClientDetail({ client, projects, payments, files, credentials }: any) {
+function TicketRow({ ticket, clientId, onRefresh }: { ticket: any; clientId: string; onRefresh: () => void }) {
+  const [expanded, setExpanded] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [comments, setComments] = useState<any[]>([]);
+  const [loadingComments, setLoadingComments] = useState(false);
+  const [reply, setReply] = useState("");
+  const [submitting, setSubmitting] = useState(false);
+  const [currentStatus, setCurrentStatus] = useState(ticket.status);
+
+  async function handleExpand() {
+    if (!expanded && comments.length === 0) {
+      setLoadingComments(true);
+      const data = await getTicketComments(ticket.id);
+      setComments(data);
+      setLoadingComments(false);
+    }
+    setExpanded((v) => !v);
+  }
+
+  async function handleReply(e: React.FormEvent) {
+    e.preventDefault();
+    if (!reply.trim()) return;
+    setSubmitting(true);
+    const result = await addAdminTicketComment(ticket.id, reply, clientId);
+    if (!result.error) {
+      const fresh = await getTicketComments(ticket.id);
+      setComments(fresh);
+      setReply("");
+      onRefresh();
+    }
+    setSubmitting(false);
+  }
+
+  async function handleStatusChange(newStatus: string) {
+    await updateTicketStatusWithAudit(ticket.id, newStatus, clientId, currentStatus, ticket.subject);
+    setCurrentStatus(newStatus);
+    onRefresh();
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden">
+      <button className="w-full px-4 py-3 text-right flex items-center justify-between gap-3" onClick={handleExpand}>
+        <span className="text-sm font-medium truncate">{ticket.subject}</span>
+        <div className="flex items-center gap-2 flex-shrink-0">
+          <Badge variant="outline" className="text-[10px] px-2">
+            {TICKET_STATUS_LABELS[currentStatus] ?? currentStatus}
+          </Badge>
+          <span className="text-muted-foreground text-xs">{expanded ? "▲" : "▼"}</span>
+        </div>
+      </button>
+
+      {expanded && (
+        <div className="border-t border-border bg-muted/20 p-4 space-y-3">
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">סטטוס:</span>
+            <select
+              value={currentStatus}
+              onChange={(e) => handleStatusChange(e.target.value)}
+              className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs"
+            >
+              <option value="open">פתוח</option>
+              <option value="in_progress">בטיפול</option>
+              <option value="resolved">נפתר</option>
+              <option value="closed">סגור</option>
+            </select>
+          </div>
+
+          {loadingComments ? (
+            <p className="text-xs text-muted-foreground text-center">טוען...</p>
+          ) : comments.length === 0 ? (
+            <p className="text-xs text-muted-foreground text-center">אין הערות עדיין</p>
+          ) : (
+            <div className="space-y-2">
+              {comments.map((c) => (
+                <div key={c.id} className={`rounded-lg px-3 py-2 text-sm max-w-[85%] ${
+                  c.author === "client"
+                    ? "bg-[#1CA9C9]/10 border border-[#1CA9C9]/20 mr-auto"
+                    : "bg-card border border-border ml-auto"
+                }`}>
+                  <p className="text-xs font-semibold mb-1 text-muted-foreground">
+                    {c.author === "client" ? "לקוח" : "Admin"}
+                  </p>
+                  <p>{c.body}</p>
+                  <p className="text-[10px] text-muted-foreground mt-1">{timeAgo(c.created_at)}</p>
+                </div>
+              ))}
+            </div>
+          )}
+
+          <form onSubmit={handleReply} className="flex gap-2">
+            <input
+              type="text"
+              value={reply}
+              onChange={(e) => setReply(e.target.value)}
+              placeholder="כתבי תגובה ללקוח..."
+              className="flex-1 text-sm border border-border rounded-lg px-3 py-2 bg-background focus:outline-none focus:border-[#1CA9C9]/50"
+              dir="rtl"
+            />
+            <Button type="submit" size="sm" className="ap-gradient text-white px-4" disabled={submitting || !reply.trim()}>
+              {submitting ? "..." : "שלח"}
+            </Button>
+          </form>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function ProjectRow({ p, onRefresh }: { p: any; onRefresh: () => void }) {
+  const imgInputRef = useRef<HTMLInputElement>(null);
+  const [uploadingImg, setUploadingImg] = useState(false);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(p.image_url ?? null);
+
+  async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    setUploadingImg(true);
+    const fd = new FormData();
+    fd.append("file", file);
+    const result = await uploadProjectImage(p.id, fd);
+    if (!result.error && result.url) {
+      setPreviewUrl(result.url);
+      onRefresh();
+    }
+    setUploadingImg(false);
+    if (imgInputRef.current) imgInputRef.current.value = "";
+  }
+
+  return (
+    <div className="bg-card border border-border rounded-xl overflow-hidden hover:border-[#1CA9C9]/30 transition-colors">
+      <div
+        className="relative w-full h-28 cursor-pointer group"
+        onClick={() => imgInputRef.current?.click()}
+        title="לחץ להעלאת תמונת כיסוי"
+      >
+        {previewUrl ? (
+          <img src={previewUrl} alt={p.name} className="w-full h-full object-cover" />
+        ) : (
+          <div className="w-full h-full flex items-center justify-center text-muted-foreground text-xs"
+            style={{ background: "linear-gradient(135deg, rgba(28,169,201,0.08) 0%, rgba(66,152,166,0.04) 100%)" }}>
+            {uploadingImg ? "מעלה..." : "+ תמונת כיסוי"}
+          </div>
+        )}
+        <div className="absolute inset-0 bg-black/30 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center text-white text-xs font-medium">
+          {uploadingImg ? "מעלה..." : "החלף תמונה"}
+        </div>
+        <input ref={imgInputRef} type="file" className="hidden" accept="image/*" onChange={handleImageUpload} />
+      </div>
+
+      <div className="p-4 space-y-3">
+        <div className="flex items-center justify-between">
+          <span className="font-semibold text-sm">{p.name}</span>
+          <StatusBadge status={p.status} />
+        </div>
+        {p.description && <p className="text-xs text-muted-foreground">{p.description}</p>}
+        <div className="flex items-center gap-3">
+          <Progress value={p.progress_pct} className="flex-1 h-1.5" />
+          <span className="text-xs text-[#1CA9C9] font-bold w-8 text-left tabular-nums">{p.progress_pct}%</span>
+        </div>
+        <div className="flex gap-2 items-center">
+          <select
+            defaultValue={p.status}
+            onChange={(e) => updateProjectProgress(p.id, e.target.value, p.progress_pct).then(() => onRefresh())}
+            className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs"
+          >
+            <option value="in_progress">בעבודה</option>
+            <option value="testing">בבדיקה</option>
+            <option value="live">Live</option>
+          </select>
+          <input
+            type="range" min={0} max={100} step={5}
+            defaultValue={p.progress_pct}
+            className="flex-1 accent-[#1CA9C9]"
+            onMouseUp={(e) => updateProjectProgress(p.id, p.status, parseInt((e.target as HTMLInputElement).value)).then(() => onRefresh())}
+          />
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export function ClientDetail({ client, projects, payments, files, credentials, tickets, auditLog }: any) {
   const router = useRouter();
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -75,6 +294,10 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
   const [uploading, setUploading] = useState(false);
   const [uploadFileType, setUploadFileType] = useState<"contract" | "spec" | "other">("other");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  const [activeTab, setActiveTab] = useState<"overview" | "tickets" | "history">("overview");
+
+  function onRefresh() { router.refresh(); }
 
   async function handleAddProject() {
     await addProject(client.id, projectForm.name, projectForm.description);
@@ -111,11 +334,8 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
       formData.append("clientId", client.id);
       formData.append("fileType", uploadFileType);
       const result = await uploadClientFile(formData);
-      if (result.error) {
-        alert("שגיאה בהעלאת הקובץ: " + result.error);
-      } else {
-        router.refresh();
-      }
+      if (result.error) alert("שגיאה בהעלאת הקובץ: " + result.error);
+      else router.refresh();
     } catch (err) {
       alert("שגיאה: " + (err instanceof Error ? err.message : String(err)));
     } finally {
@@ -193,277 +413,239 @@ export function ClientDetail({ client, projects, payments, files, credentials }:
           </Badge>
         </div>
 
-        {/* Projects + Payments */}
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-          {/* Projects */}
-          <section className="bg-card rounded-2xl border-t-2 border-t-[#1CA9C9] border border-border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold flex items-center gap-2 text-[#1CA9C9]">
-                📁 פרויקטים
-              </h2>
-              <button onClick={() => setAddingProject(!addingProject)} className="text-xs text-[#1CA9C9] hover:underline">
-                + הוסף
-              </button>
-            </div>
-
-            {addingProject && (
-              <div className="bg-card border border-[#1CA9C9]/30 rounded-xl p-4 space-y-3">
-                <Input placeholder="שם הפרויקט" value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} />
-                <Input placeholder="תיאור" value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} />
-                <div className="flex gap-2">
-                  <Button variant="outline" onClick={() => setAddingProject(false)} size="sm">ביטול</Button>
-                  <Button className="ap-gradient text-white" size="sm" onClick={handleAddProject} disabled={!projectForm.name}>הוסף</Button>
-                </div>
-              </div>
-            )}
-
-            {projects.length === 0 && !addingProject && (
-              <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">אין פרויקטים עדיין</p>
-            )}
-
-            {projects.map((p: { id: string; name: string; description?: string; status: string; progress_pct: number }) => (
-              <div key={p.id} className="bg-card border border-border rounded-xl p-4 space-y-3 hover:border-[#1CA9C9]/30 transition-colors">
-                <div className="flex items-center justify-between">
-                  <span className="font-semibold text-sm">{p.name}</span>
-                  <StatusBadge status={p.status} />
-                </div>
-                {p.description && <p className="text-xs text-muted-foreground">{p.description}</p>}
-                <div className="flex items-center gap-3">
-                  <Progress value={p.progress_pct} className="flex-1 h-1.5" />
-                  <span className="text-xs text-[#1CA9C9] font-bold w-8 text-left tabular-nums">{p.progress_pct}%</span>
-                </div>
-                <div className="flex gap-2 items-center">
-                  <select
-                    defaultValue={p.status}
-                    onChange={(e) => updateProjectProgress(p.id, e.target.value, p.progress_pct).then(() => router.refresh())}
-                    className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs"
-                  >
-                    <option value="in_progress">בעבודה</option>
-                    <option value="testing">בבדיקה</option>
-                    <option value="live">Live</option>
-                  </select>
-                  <input
-                    type="range" min={0} max={100} step={5}
-                    defaultValue={p.progress_pct}
-                    className="flex-1 accent-[#1CA9C9]"
-                    onMouseUp={(e) => updateProjectProgress(p.id, p.status, parseInt((e.target as HTMLInputElement).value)).then(() => router.refresh())}
-                  />
-                </div>
-              </div>
-            ))}
-          </section>
-
-          {/* Payments */}
-          <section className="bg-card rounded-2xl border-t-2 border-t-green-500 border border-border p-4 space-y-3">
-            <div className="flex items-center justify-between">
-              <h2 className="text-sm font-bold flex items-center gap-2 text-green-400">
-                💰 תשלומים
-              </h2>
-              <button onClick={() => setAddingPayment(!addingPayment)} className="text-xs text-[#1CA9C9] hover:underline">
-                + הוסף
-              </button>
-            </div>
-
-            {addingPayment && (
-              <div className="bg-card border border-[#1CA9C9]/30 rounded-xl p-4 space-y-3">
-                <div className="grid grid-cols-2 gap-2">
-                  <div>
-                    <Label className="text-xs">סכום (₪)</Label>
-                    <Input type="number" placeholder="3500" dir="ltr" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
-                  </div>
-                  <div>
-                    <Label className="text-xs">סטטוס</Label>
-                    <select className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm" value={paymentForm.status} onChange={(e) => setPaymentForm({ ...paymentForm, status: e.target.value })}>
-                      <option value="pending">ממתין</option>
-                      <option value="paid">שולם</option>
-                      <option value="overdue">באיחור</option>
-                    </select>
-                  </div>
-                </div>
-                <Input type="date" dir="ltr" value={paymentForm.due_date} onChange={(e) => setPaymentForm({ ...paymentForm, due_date: e.target.value })} />
-                <Input placeholder="הערות" value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
-                <div className="flex gap-2">
-                  <Button variant="outline" size="sm" onClick={() => setAddingPayment(false)}>ביטול</Button>
-                  <Button className="ap-gradient text-white" size="sm" onClick={handleAddPayment} disabled={!paymentForm.amount}>הוסף</Button>
-                </div>
-              </div>
-            )}
-
-            {payments.length === 0 && !addingPayment && (
-              <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">אין תשלומים עדיין</p>
-            )}
-
-            {payments.map((p: { id: string; amount: number; currency: string; status: string; due_date?: string; notes?: string }) => (
-              <div key={p.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between hover:border-green-500/20 transition-colors">
-                <div>
-                  <span className="font-bold">₪{p.amount.toLocaleString("he-IL")}</span>
-                  {p.due_date && <span className="text-xs text-muted-foreground mr-2">{p.due_date}</span>}
-                  {p.notes && <p className="text-xs text-muted-foreground mt-0.5">{p.notes}</p>}
-                </div>
-                <Badge variant="outline" className={`text-[10px] px-2 ${PAYMENT_BADGE[p.status]}`}>
-                  {p.status === "paid" ? "שולם" : p.status === "pending" ? "ממתין" : "באיחור"}
-                </Badge>
-              </div>
-            ))}
-          </section>
+        {/* Tabs */}
+        <div className="flex gap-1 border-b border-border">
+          {(["overview", "tickets", "history"] as const).map((tab) => (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-sm font-medium transition-colors border-b-2 -mb-px ${
+                activeTab === tab
+                  ? "border-[#1CA9C9] text-[#1CA9C9]"
+                  : "border-transparent text-muted-foreground hover:text-foreground"
+              }`}
+            >
+              {tab === "overview" ? "סקירה" : tab === "tickets" ? `טיקטים (${tickets?.length ?? 0})` : "היסטוריה"}
+            </button>
+          ))}
         </div>
 
-        {/* Credentials */}
-        <section className="bg-card rounded-2xl border-t-2 border-t-violet-500 border border-border p-4 space-y-3">
-          <h2 className="text-sm font-bold flex items-center gap-2 text-violet-400">
-            🔐 גישות מערכות
-          </h2>
-          {credentials.length === 0 ? (
-            <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">הלקוח טרם מילא גישות</p>
-          ) : (
-            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {credentials.map((cred: { id: string; system_name: string; url?: string; username?: string; password?: string; notes?: string }) => (
-                <div key={cred.id} className="bg-card border border-border rounded-xl p-4 space-y-2 hover:border-[#1CA9C9]/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <span className="font-bold text-sm text-[#1CA9C9]">{cred.system_name}</span>
-                    {cred.url && (
-                      <a href={cred.url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-foreground" dir="ltr">
-                        🔗 פתח
-                      </a>
-                    )}
-                  </div>
-                  {cred.url && <p className="text-[10px] text-muted-foreground" dir="ltr">{cred.url}</p>}
-                  {cred.username && (
-                    <div className="text-xs">
-                      <span className="text-muted-foreground">משתמש: </span>
-                      <span dir="ltr">{cred.username}</span>
-                    </div>
-                  )}
-                  {cred.password && (
-                    <div className="text-xs flex items-center gap-2">
-                      <span className="text-muted-foreground">סיסמה: </span>
-                      <span dir="ltr" className="font-mono">
-                        {showPasswords[cred.id] ? cred.password : "••••••••"}
-                      </span>
-                      <button
-                        onClick={() => setShowPasswords((p) => ({ ...p, [cred.id]: !p[cred.id] }))}
-                        className="text-[#1CA9C9] hover:underline text-[10px]"
-                      >
-                        {showPasswords[cred.id] ? "הסתר" : "הצג"}
-                      </button>
-                    </div>
-                  )}
-                  {cred.notes && <p className="text-[10px] text-muted-foreground">{cred.notes}</p>}
+        {/* ── Overview Tab ── */}
+        {activeTab === "overview" && (
+          <div className="space-y-6">
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              {/* Projects */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-[#1CA9C9]">📁 פרויקטים</h2>
+                  <button onClick={() => setAddingProject(!addingProject)} className="text-xs text-[#1CA9C9] hover:underline">+ הוסף</button>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Files */}
-        <section className="bg-card rounded-2xl border-t-2 border-t-purple-500 border border-border p-4 space-y-3">
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-bold flex items-center gap-2 text-purple-400">
-              📎 קבצים ומסמכים
-            </h2>
-            <div className="flex items-center gap-2">
-              <select
-                value={uploadFileType}
-                onChange={(e) => setUploadFileType(e.target.value as "contract" | "spec" | "other")}
-                className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs"
-              >
-                <option value="contract">חוזה</option>
-                <option value="spec">אפיון</option>
-                <option value="other">אחר</option>
-              </select>
-              <Button
-                size="sm"
-                variant="outline"
-                onClick={() => fileInputRef.current?.click()}
-                disabled={uploading}
-                className="text-xs"
-              >
-                {uploading ? "מעלה..." : "+ העלה קובץ"}
-              </Button>
-              <input
-                ref={fileInputRef}
-                type="file"
-                className="hidden"
-                onChange={handleFileUpload}
-                accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip"
-              />
-            </div>
-          </div>
-
-          {files.length === 0 ? (
-            <div className="bg-card border border-dashed border-border rounded-xl p-6 text-center text-muted-foreground text-sm">
-              <p className="text-2xl mb-2">📎</p>
-              <p>אין קבצים עדיין</p>
-              <p className="text-xs mt-1">העלי חוזה, מסמך אפיון, או כל קובץ רלוונטי</p>
-            </div>
-          ) : (
-            <div className="space-y-2">
-              {files.map((f: { id: string; filename: string; storage_path: string; file_type: string; size_bytes: number; uploaded_at: string }) => (
-                <div key={f.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-3 hover:border-purple-500/30 transition-colors">
-                  <div className="flex items-center gap-3 min-w-0">
-                    <span className="text-xl flex-shrink-0">
-                      {f.file_type === "contract" ? "📄" : f.file_type === "spec" ? "📋" : "📎"}
-                    </span>
-                    <div className="min-w-0">
-                      <p className="text-sm font-medium truncate">{f.filename}</p>
-                      <p className="text-[10px] text-muted-foreground">
-                        {formatBytes(f.size_bytes)} · {new Date(f.uploaded_at).toLocaleDateString("he-IL")}
-                      </p>
+                {addingProject && (
+                  <div className="bg-card border border-[#1CA9C9]/30 rounded-xl p-4 space-y-3">
+                    <Input placeholder="שם הפרויקט" value={projectForm.name} onChange={(e) => setProjectForm({ ...projectForm, name: e.target.value })} />
+                    <Input placeholder="תיאור" value={projectForm.description} onChange={(e) => setProjectForm({ ...projectForm, description: e.target.value })} />
+                    <div className="flex gap-2">
+                      <Button variant="outline" onClick={() => setAddingProject(false)} size="sm">ביטול</Button>
+                      <Button className="ap-gradient text-white" size="sm" onClick={handleAddProject} disabled={!projectForm.name}>הוסף</Button>
                     </div>
                   </div>
-                  <div className="flex items-center gap-2 flex-shrink-0">
-                    <Badge variant="outline" className={`text-[10px] px-2 ${FILE_TYPE_STYLES[f.file_type]}`}>
-                      {FILE_TYPE_LABELS[f.file_type]}
+                )}
+                {projects.length === 0 && !addingProject && (
+                  <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">אין פרויקטים עדיין</p>
+                )}
+                <div className="space-y-3">
+                  {projects.map((p: { id: string; name: string; description?: string; status: string; progress_pct: number; image_url?: string }) => (
+                    <ProjectRow key={p.id} p={p} onRefresh={onRefresh} />
+                  ))}
+                </div>
+              </section>
+
+              {/* Payments */}
+              <section className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <h2 className="text-sm font-bold text-green-400">💰 תשלומים</h2>
+                  <button onClick={() => setAddingPayment(!addingPayment)} className="text-xs text-[#1CA9C9] hover:underline">+ הוסף</button>
+                </div>
+                {addingPayment && (
+                  <div className="bg-card border border-[#1CA9C9]/30 rounded-xl p-4 space-y-3">
+                    <div className="grid grid-cols-2 gap-2">
+                      <div>
+                        <Label className="text-xs">סכום (₪)</Label>
+                        <Input type="number" placeholder="3500" dir="ltr" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
+                      </div>
+                      <div>
+                        <Label className="text-xs">סטטוס</Label>
+                        <select className="w-full bg-input border border-border rounded-lg px-3 py-2 text-sm" value={paymentForm.status} onChange={(e) => setPaymentForm({ ...paymentForm, status: e.target.value })}>
+                          <option value="pending">ממתין</option>
+                          <option value="paid">שולם</option>
+                          <option value="overdue">באיחור</option>
+                        </select>
+                      </div>
+                    </div>
+                    <Input type="date" dir="ltr" value={paymentForm.due_date} onChange={(e) => setPaymentForm({ ...paymentForm, due_date: e.target.value })} />
+                    <Input placeholder="הערות" value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
+                    <div className="flex gap-2">
+                      <Button variant="outline" size="sm" onClick={() => setAddingPayment(false)}>ביטול</Button>
+                      <Button className="ap-gradient text-white" size="sm" onClick={handleAddPayment} disabled={!paymentForm.amount}>הוסף</Button>
+                    </div>
+                  </div>
+                )}
+                {payments.length === 0 && !addingPayment && (
+                  <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">אין תשלומים עדיין</p>
+                )}
+                {payments.map((p: { id: string; amount: number; currency: string; status: string; due_date?: string; notes?: string }) => (
+                  <div key={p.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between hover:border-green-500/20 transition-colors">
+                    <div>
+                      <span className="font-bold">₪{p.amount.toLocaleString("he-IL")}</span>
+                      {p.due_date && <span className="text-xs text-muted-foreground mr-2">{p.due_date}</span>}
+                      {p.notes && <p className="text-xs text-muted-foreground mt-0.5">{p.notes}</p>}
+                    </div>
+                    <Badge variant="outline" className={`text-[10px] px-2 ${PAYMENT_BADGE[p.status]}`}>
+                      {p.status === "paid" ? "שולם" : p.status === "pending" ? "ממתין" : "באיחור"}
                     </Badge>
-                    <Button
-                      size="sm"
-                      variant="ghost"
-                      onClick={() => handleDownload(f.id, f.storage_path, f.filename)}
-                      disabled={downloadingId === f.id}
-                      className="text-xs h-7 px-2"
-                    >
-                      {downloadingId === f.id ? "..." : "הורד"}
-                    </Button>
-                    <button
-                      onClick={() => handleDeleteFile(f.id, f.storage_path)}
-                      className="text-muted-foreground hover:text-destructive text-xs"
-                    >
-                      ✕
-                    </button>
+                  </div>
+                ))}
+              </section>
+            </div>
+
+            {/* Credentials */}
+            <section className="bg-card rounded-2xl border-t-2 border-t-violet-500 border border-border p-4 space-y-3">
+              <h2 className="text-sm font-bold text-violet-400">🔐 גישות מערכות</h2>
+              {credentials.length === 0 ? (
+                <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">הלקוח טרם מילא גישות</p>
+              ) : (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  {credentials.map((cred: { id: string; system_name: string; url?: string; username?: string; password?: string; notes?: string }) => (
+                    <div key={cred.id} className="bg-card border border-border rounded-xl p-4 space-y-2 hover:border-[#1CA9C9]/30 transition-colors">
+                      <div className="flex items-center justify-between">
+                        <span className="font-bold text-sm text-[#1CA9C9]">{cred.system_name}</span>
+                        {cred.url && <a href={cred.url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-foreground" dir="ltr">🔗 פתח</a>}
+                      </div>
+                      {cred.url && <p className="text-[10px] text-muted-foreground" dir="ltr">{cred.url}</p>}
+                      {cred.username && <div className="text-xs"><span className="text-muted-foreground">משתמש: </span><span dir="ltr">{cred.username}</span></div>}
+                      {cred.password && (
+                        <div className="text-xs flex items-center gap-2">
+                          <span className="text-muted-foreground">סיסמה: </span>
+                          <span dir="ltr" className="font-mono">{showPasswords[cred.id] ? cred.password : "••••••••"}</span>
+                          <button onClick={() => setShowPasswords((prev) => ({ ...prev, [cred.id]: !prev[cred.id] }))} className="text-[#1CA9C9] hover:underline text-[10px]">
+                            {showPasswords[cred.id] ? "הסתר" : "הצג"}
+                          </button>
+                        </div>
+                      )}
+                      {cred.notes && <p className="text-[10px] text-muted-foreground">{cred.notes}</p>}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Files */}
+            <section className="bg-card rounded-2xl border-t-2 border-t-purple-500 border border-border p-4 space-y-3">
+              <div className="flex items-center justify-between">
+                <h2 className="text-sm font-bold text-purple-400">📎 קבצים ומסמכים</h2>
+                <div className="flex items-center gap-2">
+                  <select value={uploadFileType} onChange={(e) => setUploadFileType(e.target.value as "contract" | "spec" | "other")} className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs">
+                    <option value="contract">חוזה</option>
+                    <option value="spec">אפיון</option>
+                    <option value="other">אחר</option>
+                  </select>
+                  <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="text-xs">
+                    {uploading ? "מעלה..." : "+ העלה קובץ"}
+                  </Button>
+                  <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip" />
+                </div>
+              </div>
+              {files.length === 0 ? (
+                <div className="bg-card border border-dashed border-border rounded-xl p-6 text-center text-muted-foreground text-sm">
+                  <p className="text-2xl mb-2">📎</p><p>אין קבצים עדיין</p>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {files.map((f: { id: string; filename: string; storage_path: string; file_type: string; size_bytes: number; uploaded_at: string }) => (
+                    <div key={f.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-3 hover:border-purple-500/30 transition-colors">
+                      <div className="flex items-center gap-3 min-w-0">
+                        <span className="text-xl flex-shrink-0">{f.file_type === "contract" ? "📄" : f.file_type === "spec" ? "📋" : "📎"}</span>
+                        <div className="min-w-0">
+                          <p className="text-sm font-medium truncate">{f.filename}</p>
+                          <p className="text-[10px] text-muted-foreground">{formatBytes(f.size_bytes)} · {new Date(f.uploaded_at).toLocaleDateString("he-IL")}</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2 flex-shrink-0">
+                        <Badge variant="outline" className={`text-[10px] px-2 ${FILE_TYPE_STYLES[f.file_type]}`}>{FILE_TYPE_LABELS[f.file_type]}</Badge>
+                        <Button size="sm" variant="ghost" onClick={() => handleDownload(f.id, f.storage_path, f.filename)} disabled={downloadingId === f.id} className="text-xs h-7 px-2">
+                          {downloadingId === f.id ? "..." : "הורד"}
+                        </Button>
+                        <button onClick={() => handleDeleteFile(f.id, f.storage_path)} className="text-muted-foreground hover:text-destructive text-xs">✕</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </section>
+
+            {/* Admin Notes */}
+            <section className="bg-card rounded-2xl border-t-2 border-t-yellow-500 border border-border p-4 space-y-3 pb-8">
+              <h2 className="text-sm font-bold text-yellow-400">
+                📝 הערות פנימיות <span className="text-[10px] normal-case font-normal text-muted-foreground">(גלויות לך בלבד)</span>
+              </h2>
+              <Textarea value={notes} onChange={(e) => setNotes(e.target.value)} onBlur={handleNotesSave} placeholder="הערות, תזכורות, או כל מידע פנימי על הלקוח..." rows={4} className="resize-none" />
+              <div className="flex items-center justify-between">
+                <p className="text-xs text-muted-foreground">נשמר אוטומטית בעת יציאה מהשדה</p>
+                <Button size="sm" variant="outline" onClick={handleNotesSave} disabled={notesSaving} className="text-xs h-7">
+                  {notesSaving ? "שומר..." : "שמור עכשיו"}
+                </Button>
+              </div>
+            </section>
+          </div>
+        )}
+
+        {/* ── Tickets Tab ── */}
+        {activeTab === "tickets" && (
+          <div className="space-y-3 pb-8">
+            {(!tickets || tickets.length === 0) ? (
+              <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">אין טיקטים עדיין</div>
+            ) : (
+              tickets.map((ticket: { id: string; subject: string; status: string; priority: string; description?: string; created_at: string }) => (
+                <TicketRow key={ticket.id} ticket={ticket} clientId={client.id} onRefresh={onRefresh} />
+              ))
+            )}
+          </div>
+        )}
+
+        {/* ── History Tab ── */}
+        {activeTab === "history" && (
+          <div className="space-y-2 pb-8">
+            {(!auditLog || auditLog.length === 0) ? (
+              <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">אין היסטוריה עדיין</div>
+            ) : (
+              auditLog.map((entry: { id: string; entity_type: string; action: string; details?: { from?: string; to?: string; subject?: string; body?: string }; actor: string; created_at: string }) => (
+                <div key={entry.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-start gap-3 hover:border-[#1CA9C9]/20 transition-colors">
+                  <span className="text-base mt-0.5 flex-shrink-0">
+                    {entry.entity_type === "ticket" ? "◎" : entry.entity_type === "file" ? "📎" : entry.entity_type === "comment" ? "💬" : entry.entity_type === "project" ? "◉" : "·"}
+                  </span>
+                  <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                      <p className="text-sm font-medium">
+                        {ENTITY_LABELS[entry.entity_type] ?? entry.entity_type} · {ACTION_LABELS[entry.action] ?? entry.action}
+                        {entry.details?.subject ? `: "${entry.details.subject}"` : ""}
+                      </p>
+                      <span className={`text-[10px] px-2 py-0.5 rounded-full flex-shrink-0 ${entry.actor === "admin" ? "bg-[rgba(28,169,201,0.12)] text-[#1CA9C9]" : "bg-secondary text-muted-foreground"}`}>
+                        {entry.actor === "admin" ? "Admin" : "לקוח"}
+                      </span>
+                    </div>
+                    {entry.details?.from && entry.details?.to && (
+                      <p className="text-xs text-muted-foreground mt-0.5">{entry.details.from} ← {entry.details.to}</p>
+                    )}
+                    {entry.details?.body && (
+                      <p className="text-xs text-muted-foreground mt-0.5 line-clamp-1">{entry.details.body}</p>
+                    )}
+                    <p className="text-[10px] text-muted-foreground mt-1">{timeAgo(entry.created_at)}</p>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-
-        {/* Admin Notes */}
-        <section className="bg-card rounded-2xl border-t-2 border-t-yellow-500 border border-border p-4 space-y-3 pb-8">
-          <h2 className="text-sm font-bold flex items-center gap-2 text-yellow-400">
-            📝 הערות פנימיות
-            <span className="text-[10px] normal-case font-normal text-muted-foreground">(גלויות לך בלבד)</span>
-          </h2>
-          <Textarea
-            value={notes}
-            onChange={(e) => setNotes(e.target.value)}
-            onBlur={handleNotesSave}
-            placeholder="הערות, תזכורות, או כל מידע פנימי על הלקוח..."
-            rows={4}
-            className="resize-none"
-          />
-          <div className="flex items-center justify-between">
-            <p className="text-xs text-muted-foreground">נשמר אוטומטית בעת יציאה מהשדה</p>
-            <Button
-              size="sm"
-              variant="outline"
-              onClick={handleNotesSave}
-              disabled={notesSaving}
-              className="text-xs h-7"
-            >
-              {notesSaving ? "שומר..." : "שמור עכשיו"}
-            </Button>
+              ))
+            )}
           </div>
-        </section>
+        )}
       </div>
     </div>
   );

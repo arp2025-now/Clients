@@ -32,8 +32,25 @@ const CLIENT_STATUS_BADGE: Record<string, string> = {
   paused:     "bg-yellow-500/15 text-yellow-400 border-yellow-500/20",
 };
 
+function timeAgo(iso: string) {
+  const diff = Date.now() - new Date(iso).getTime();
+  const mins = Math.floor(diff / 60000);
+  if (mins < 1) return "עכשיו";
+  if (mins < 60) return `לפני ${mins} דקות`;
+  const hours = Math.floor(mins / 60);
+  if (hours < 24) return `לפני ${hours} שעות`;
+  return `לפני ${Math.floor(hours / 24)} ימים`;
+}
+
+const ACTION_LABELS: Record<string, string> = {
+  created: "נוצר", updated: "עודכן", status_changed: "שינוי סטטוס", commented: "תגובה", uploaded: "קובץ הועלה",
+};
+const ENTITY_LABELS: Record<string, string> = {
+  ticket: "טיקט", project: "פרויקט", payment: "תשלום", file: "קובץ", comment: "הערה",
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export function AdminDashboard({ clients, openTickets }: { clients: any[]; openTickets: any[] }) {
+export function AdminDashboard({ clients, openTickets, totalRevenue = 0, recentActivity = [] }: { clients: any[]; openTickets: any[]; totalRevenue?: number; recentActivity?: any[] }) {
   const router = useRouter();
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteLoading, setInviteLoading] = useState(false);
@@ -100,7 +117,7 @@ export function AdminDashboard({ clients, openTickets }: { clients: any[]; openT
       </div>
 
       {/* Stats bar */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-4 gap-4">
         <div className="bg-card border border-border rounded-xl p-4 space-y-1">
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">סה״כ לקוחות</p>
           <p className="text-3xl font-black text-foreground">{clients.length}</p>
@@ -112,6 +129,12 @@ export function AdminDashboard({ clients, openTickets }: { clients: any[]; openT
         <div className={`bg-card border rounded-xl p-4 space-y-1 ${totalOpenTickets > 0 ? "border-yellow-500/20" : "border-green-500/20"}`}>
           <p className="text-[10px] uppercase tracking-wider text-muted-foreground">טיקטים פתוחים</p>
           <p className={`text-3xl font-black ${totalOpenTickets > 0 ? "text-yellow-400" : "text-green-400"}`}>{totalOpenTickets}</p>
+        </div>
+        <div className="bg-card border border-green-500/20 rounded-xl p-4 space-y-1">
+          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">הכנסה (שולם)</p>
+          <p className="text-2xl font-black text-green-400 tabular-nums">
+            ₪{totalRevenue.toLocaleString("he-IL")}
+          </p>
         </div>
       </div>
 
@@ -169,6 +192,32 @@ export function AdminDashboard({ clients, openTickets }: { clients: any[]; openT
           </div>
         )}
       </section>
+
+      {/* Recent activity */}
+      {recentActivity.length > 0 && (
+        <section>
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
+            <span className="w-1 h-4 rounded-full bg-purple-500 inline-block" />
+            פעילות אחרונה
+          </h2>
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            {recentActivity.map((entry) => (
+              <div key={entry.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-start gap-3">
+                <span className="text-base mt-0.5 flex-shrink-0">
+                  {entry.entity_type === "ticket" ? "◎" : entry.entity_type === "file" ? "📎" : entry.entity_type === "comment" ? "💬" : "◉"}
+                </span>
+                <div className="min-w-0">
+                  <p className="text-xs font-medium">
+                    {entry.clients?.business_name && <span className="text-[#1CA9C9]">{entry.clients.business_name} · </span>}
+                    {ENTITY_LABELS[entry.entity_type] ?? entry.entity_type} {ACTION_LABELS[entry.action] ?? entry.action}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">{timeAgo(entry.created_at)}</p>
+                </div>
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Open tickets */}
       <section>
