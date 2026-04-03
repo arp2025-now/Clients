@@ -7,10 +7,10 @@ import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { saveBasicInfo, saveCredentials } from "./actions";
+import { setPassword, saveBasicInfo, saveCredentials } from "./actions";
 
-const STEP_LABELS = ["פרטי עסק", "גישות מערכות", "סיום"];
-const TOTAL_STEPS = 3;
+const STEP_LABELS = ["הגדרת סיסמה", "פרטי עסק", "גישות מערכות", "סיום"];
+const TOTAL_STEPS = 4;
 
 type Credential = {
   system_name: string;
@@ -34,7 +34,11 @@ export default function OnboardingPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
-  // Step 1 state
+  // Step 1 state — password
+  const [password, setPasswordValue] = useState("");
+  const [passwordConfirm, setPasswordConfirm] = useState("");
+
+  // Step 2 state
   const [basicInfo, setBasicInfo] = useState({
     business_name: "",
     phone: "",
@@ -45,12 +49,18 @@ export default function OnboardingPage() {
   const [credentials, setCredentials] = useState<Credential[]>([emptyCredential()]);
 
   async function handleStep1() {
+    if (password.length < 8) {
+      setError("הסיסמה חייבת להכיל לפחות 8 תווים");
+      return;
+    }
+    if (password !== passwordConfirm) {
+      setError("הסיסמאות אינן תואמות");
+      return;
+    }
     setLoading(true);
     setError("");
     try {
-      const fd = new FormData();
-      Object.entries(basicInfo).forEach(([k, v]) => fd.set(k, v));
-      await saveBasicInfo(fd);
+      await setPassword(password);
       setStep(2);
     } catch (e: unknown) {
       setError((e as Error).message);
@@ -63,9 +73,24 @@ export default function OnboardingPage() {
     setLoading(true);
     setError("");
     try {
+      const fd = new FormData();
+      Object.entries(basicInfo).forEach(([k, v]) => fd.set(k, v));
+      await saveBasicInfo(fd);
+      setStep(3);
+    } catch (e: unknown) {
+      setError((e as Error).message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleStep3() {
+    setLoading(true);
+    setError("");
+    try {
       const filled = credentials.filter((c) => c.system_name.trim());
       if (filled.length > 0) await saveCredentials(filled);
-      setStep(3);
+      setStep(4);
     } catch (e: unknown) {
       setError((e as Error).message);
     } finally {
@@ -111,8 +136,49 @@ export default function OnboardingPage() {
               </p>
             )}
 
-            {/* Step 1 — Basic Info */}
+            {/* Step 1 — Set Password */}
             {step === 1 && (
+              <div className="space-y-4">
+                <CardHeader className="px-0 pt-0 pb-2">
+                  <h2 className="text-base font-bold">הגדרת סיסמה</h2>
+                  <p className="text-sm text-muted-foreground">
+                    בחרי סיסמה לכניסה לפורטל בעתיד
+                  </p>
+                </CardHeader>
+                <div className="space-y-1.5">
+                  <Label>סיסמה חדשה *</Label>
+                  <Input
+                    dir="ltr"
+                    type="password"
+                    autoComplete="new-password"
+                    value={password}
+                    onChange={(e) => setPasswordValue(e.target.value)}
+                    placeholder="לפחות 8 תווים"
+                  />
+                </div>
+                <div className="space-y-1.5">
+                  <Label>אימות סיסמה *</Label>
+                  <Input
+                    dir="ltr"
+                    type="password"
+                    autoComplete="new-password"
+                    value={passwordConfirm}
+                    onChange={(e) => setPasswordConfirm(e.target.value)}
+                    placeholder="הקלידי שוב את הסיסמה"
+                  />
+                </div>
+                <Button
+                  className="w-full ap-gradient text-white mt-2"
+                  onClick={handleStep1}
+                  disabled={loading || !password || !passwordConfirm}
+                >
+                  {loading ? "שומרת..." : "המשך ←"}
+                </Button>
+              </div>
+            )}
+
+            {/* Step 2 — Basic Info */}
+            {step === 2 && (
               <div className="space-y-4">
                 <CardHeader className="px-0 pt-0 pb-2">
                   <h2 className="text-base font-bold">פרטי העסק</h2>
@@ -148,7 +214,7 @@ export default function OnboardingPage() {
                 </div>
                 <Button
                   className="w-full ap-gradient text-white mt-2"
-                  onClick={handleStep1}
+                  onClick={handleStep2}
                   disabled={loading || !basicInfo.business_name.trim()}
                 >
                   {loading ? "שומרת..." : "המשך ←"}
@@ -156,8 +222,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 2 — Credentials */}
-            {step === 2 && (
+            {/* Step 3 — Credentials */}
+            {step === 3 && (
               <div className="space-y-5">
                 <CardHeader className="px-0 pt-0 pb-2">
                   <h2 className="text-base font-bold">גישות למערכות</h2>
@@ -237,12 +303,12 @@ export default function OnboardingPage() {
                 </Button>
 
                 <div className="flex gap-3">
-                  <Button variant="outline" onClick={() => setStep(1)} className="flex-1">
+                  <Button variant="outline" onClick={() => setStep(2)} className="flex-1">
                     → חזרה
                   </Button>
                   <Button
                     className="flex-1 ap-gradient text-white"
-                    onClick={handleStep2}
+                    onClick={handleStep3}
                     disabled={loading}
                   >
                     {loading ? "שומרת..." : "סיום ←"}
@@ -251,8 +317,8 @@ export default function OnboardingPage() {
               </div>
             )}
 
-            {/* Step 3 — Done */}
-            {step === 3 && (
+            {/* Step 4 — Done */}
+            {step === 4 && (
               <div className="text-center py-8 space-y-5">
                 <div className="w-20 h-20 rounded-full ap-gradient flex items-center justify-center text-4xl mx-auto ap-glow">
                   ✓
