@@ -23,6 +23,9 @@ import {
   addAdminTicketComment,
   uploadProjectImage,
   updateTicketStatusWithAudit,
+  addAdminCredential,
+  updateAdminCredential,
+  deleteAdminCredential,
 } from "@/app/(admin)/admin/actions";
 
 const PAYMENT_BADGE: Record<string, string> = {
@@ -207,6 +210,8 @@ function ProjectRow({ p, onRefresh }: { p: any; onRefresh: () => void }) {
   const imgInputRef = useRef<HTMLInputElement>(null);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(p.image_url ?? null);
+  const [progress, setProgress] = useState<number>(p.progress_pct ?? 0);
+  const [currentStatus, setCurrentStatus] = useState<string>(p.status);
 
   async function handleImageUpload(e: React.ChangeEvent<HTMLInputElement>) {
     const file = e.target.files?.[0];
@@ -221,6 +226,17 @@ function ProjectRow({ p, onRefresh }: { p: any; onRefresh: () => void }) {
     }
     setUploadingImg(false);
     if (imgInputRef.current) imgInputRef.current.value = "";
+  }
+
+  async function handleProgressSave(newProgress: number) {
+    await updateProjectProgress(p.id, currentStatus, newProgress);
+    onRefresh();
+  }
+
+  async function handleStatusChange(newStatus: string) {
+    setCurrentStatus(newStatus);
+    await updateProjectProgress(p.id, newStatus, progress);
+    onRefresh();
   }
 
   return (
@@ -247,17 +263,18 @@ function ProjectRow({ p, onRefresh }: { p: any; onRefresh: () => void }) {
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="font-semibold text-sm">{p.name}</span>
-          <StatusBadge status={p.status} />
+          <StatusBadge status={currentStatus} />
         </div>
         {p.description && <p className="text-xs text-muted-foreground">{p.description}</p>}
+        {/* Progress bar + % — updates in real time as slider moves */}
         <div className="flex items-center gap-3">
-          <Progress value={p.progress_pct} className="flex-1 h-1.5" />
-          <span className="text-xs text-[#1CA9C9] font-bold w-8 text-left tabular-nums">{p.progress_pct}%</span>
+          <Progress value={progress} className="flex-1 h-1.5" />
+          <span className="text-xs text-[#1CA9C9] font-bold w-8 text-left tabular-nums">{progress}%</span>
         </div>
         <div className="flex gap-2 items-center">
           <select
-            defaultValue={p.status}
-            onChange={(e) => updateProjectProgress(p.id, e.target.value, p.progress_pct).then(() => onRefresh())}
+            value={currentStatus}
+            onChange={(e) => handleStatusChange(e.target.value)}
             className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs"
           >
             <option value="in_progress">בעבודה</option>
@@ -266,13 +283,142 @@ function ProjectRow({ p, onRefresh }: { p: any; onRefresh: () => void }) {
           </select>
           <input
             type="range" min={0} max={100} step={5}
-            defaultValue={p.progress_pct}
+            value={progress}
             className="flex-1 accent-[#1CA9C9]"
-            onMouseUp={(e) => updateProjectProgress(p.id, p.status, parseInt((e.target as HTMLInputElement).value)).then(() => onRefresh())}
+            onChange={(e) => setProgress(parseInt(e.target.value))}
+            onMouseUp={(e) => handleProgressSave(parseInt((e.target as HTMLInputElement).value))}
           />
         </div>
       </div>
     </div>
+  );
+}
+
+// ── Credentials section with full CRUD ─────────────────────────
+const EMPTY_CRED = { system_name: "", url: "", username: "", password: "", notes: "" };
+
+function CredentialsSection({ credentials, clientId, showPasswords, setShowPasswords, onRefresh }: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  credentials: any[];
+  clientId: string;
+  showPasswords: Record<string, boolean>;
+  setShowPasswords: React.Dispatch<React.SetStateAction<Record<string, boolean>>>;
+  onRefresh: () => void;
+}) {
+  const [adding, setAdding] = useState(false);
+  const [addForm, setAddForm] = useState(EMPTY_CRED);
+  const [addSaving, setAddSaving] = useState(false);
+  const [addError, setAddError] = useState<string | null>(null);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const [editForm, setEditForm] = useState<any>(EMPTY_CRED);
+
+  async function handleAdd() {
+    if (!addForm.system_name.trim()) return;
+    setAddSaving(true);
+    setAddError(null);
+    const result = await addAdminCredential(clientId, addForm.system_name, addForm.url, addForm.username, addForm.password, addForm.notes);
+    if (result.error) { setAddError(result.error); setAddSaving(false); return; }
+    setAdding(false);
+    setAddForm(EMPTY_CRED);
+    setAddSaving(false);
+    onRefresh();
+  }
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function startEdit(cred: any) {
+    setEditingId(cred.id);
+    setEditForm({ system_name: cred.system_name, url: cred.url ?? "", username: cred.username ?? "", password: "", notes: cred.notes ?? "" });
+  }
+
+  async function handleUpdate() {
+    if (!editingId) return;
+    const result = await updateAdminCredential(editingId, clientId, editForm.system_name, editForm.url, editForm.username, editForm.password, editForm.notes);
+    if (!result.error) { setEditingId(null); onRefresh(); }
+  }
+
+  async function handleDelete(credId: string) {
+    if (!confirm("למחוק גישה זו?")) return;
+    await deleteAdminCredential(credId, clientId);
+    onRefresh();
+  }
+
+  const inputCls = "w-full bg-input border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#1CA9C9]/50";
+
+  return (
+    <section className="bg-card rounded-2xl border-t-2 border-t-violet-500 border border-border p-4 space-y-3">
+      <div className="flex items-center justify-between">
+        <h2 className="text-sm font-bold text-violet-400">🔐 גישות מערכות</h2>
+        <button onClick={() => { setAdding(!adding); setAddError(null); }} className="text-xs text-[#1CA9C9] hover:underline">+ הוסף</button>
+      </div>
+
+      {/* Add form */}
+      {adding && (
+        <div className="bg-card border border-[#1CA9C9]/30 rounded-xl p-4 space-y-2">
+          <input className={inputCls} placeholder="שם המערכת *" value={addForm.system_name} onChange={(e) => setAddForm({ ...addForm, system_name: e.target.value })} />
+          <input className={inputCls} placeholder="כתובת URL" dir="ltr" value={addForm.url} onChange={(e) => setAddForm({ ...addForm, url: e.target.value })} />
+          <input className={inputCls} placeholder="שם משתמש" dir="ltr" value={addForm.username} onChange={(e) => setAddForm({ ...addForm, username: e.target.value })} />
+          <input className={inputCls} type="password" placeholder="סיסמה" dir="ltr" value={addForm.password} onChange={(e) => setAddForm({ ...addForm, password: e.target.value })} />
+          <input className={inputCls} placeholder="הערות" value={addForm.notes} onChange={(e) => setAddForm({ ...addForm, notes: e.target.value })} />
+          {addError && <p className="text-xs text-red-400">{addError}</p>}
+          <div className="flex gap-2 pt-1">
+            <Button variant="outline" size="sm" onClick={() => { setAdding(false); setAddError(null); }}>ביטול</Button>
+            <Button className="ap-gradient text-white" size="sm" onClick={handleAdd} disabled={addSaving || !addForm.system_name.trim()}>
+              {addSaving ? "שומר..." : "הוסף"}
+            </Button>
+          </div>
+        </div>
+      )}
+
+      {credentials.length === 0 && !adding && (
+        <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">אין גישות עדיין</p>
+      )}
+
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        {credentials.map((cred: { id: string; system_name: string; url?: string; username?: string; password?: string; notes?: string }) => (
+          <div key={cred.id} className="bg-card border border-border rounded-xl p-4 space-y-2 hover:border-violet-500/30 transition-colors">
+            {editingId === cred.id ? (
+              // Edit mode
+              <div className="space-y-2">
+                <input className={inputCls} placeholder="שם המערכת *" value={editForm.system_name} onChange={(e) => setEditForm({ ...editForm, system_name: e.target.value })} />
+                <input className={inputCls} placeholder="URL" dir="ltr" value={editForm.url} onChange={(e) => setEditForm({ ...editForm, url: e.target.value })} />
+                <input className={inputCls} placeholder="שם משתמש" dir="ltr" value={editForm.username} onChange={(e) => setEditForm({ ...editForm, username: e.target.value })} />
+                <input className={inputCls} type="password" placeholder="סיסמה חדשה (ריק = ללא שינוי)" dir="ltr" value={editForm.password} onChange={(e) => setEditForm({ ...editForm, password: e.target.value })} />
+                <input className={inputCls} placeholder="הערות" value={editForm.notes} onChange={(e) => setEditForm({ ...editForm, notes: e.target.value })} />
+                <div className="flex gap-2 pt-1">
+                  <Button variant="outline" size="sm" onClick={() => setEditingId(null)}>ביטול</Button>
+                  <Button className="ap-gradient text-white" size="sm" onClick={handleUpdate} disabled={!editForm.system_name.trim()}>שמור</Button>
+                </div>
+              </div>
+            ) : (
+              // View mode
+              <>
+                <div className="flex items-center justify-between">
+                  <span className="font-bold text-sm text-[#1CA9C9]">{cred.system_name}</span>
+                  <div className="flex items-center gap-2">
+                    {cred.url && <a href={cred.url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-foreground" dir="ltr">🔗</a>}
+                    <button onClick={() => startEdit(cred)} className="text-xs text-muted-foreground hover:text-[#1CA9C9]">✏️</button>
+                    <button onClick={() => handleDelete(cred.id)} className="text-xs text-muted-foreground hover:text-destructive">✕</button>
+                  </div>
+                </div>
+                {cred.url && <p className="text-[10px] text-muted-foreground" dir="ltr">{cred.url}</p>}
+                {cred.username && <div className="text-xs"><span className="text-muted-foreground">משתמש: </span><span dir="ltr">{cred.username}</span></div>}
+                {cred.password && (
+                  <div className="text-xs flex items-center gap-2">
+                    <span className="text-muted-foreground">סיסמה: </span>
+                    <span dir="ltr" className="font-mono">{showPasswords[cred.id] ? cred.password : "••••••••"}</span>
+                    <button onClick={() => setShowPasswords((prev) => ({ ...prev, [cred.id]: !prev[cred.id] }))} className="text-[#1CA9C9] hover:underline text-[10px]">
+                      {showPasswords[cred.id] ? "הסתר" : "הצג"}
+                    </button>
+                  </div>
+                )}
+                {cred.notes && <p className="text-[10px] text-muted-foreground">{cred.notes}</p>}
+              </>
+            )}
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
@@ -294,6 +440,8 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
   const [uploading, setUploading] = useState(false);
   const [uploadFileType, setUploadFileType] = useState<"contract" | "spec" | "other">("other");
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
+  const [paymentSaving, setPaymentSaving] = useState(false);
 
   const [activeTab, setActiveTab] = useState<"overview" | "tickets" | "history">("overview");
 
@@ -307,10 +455,18 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
   }
 
   async function handleAddPayment() {
-    await addPayment(client.id, parseFloat(paymentForm.amount), paymentForm.status, paymentForm.due_date, paymentForm.notes);
-    setPaymentForm({ amount: "", status: "pending", due_date: "", notes: "" });
-    setAddingPayment(false);
-    router.refresh();
+    setPaymentSaving(true);
+    setPaymentError(null);
+    try {
+      await addPayment(client.id, parseFloat(paymentForm.amount), paymentForm.status, paymentForm.due_date, paymentForm.notes);
+      setPaymentForm({ amount: "", status: "pending", due_date: "", notes: "" });
+      setAddingPayment(false);
+      router.refresh();
+    } catch (e: unknown) {
+      setPaymentError((e as Error).message);
+    } finally {
+      setPaymentSaving(false);
+    }
   }
 
   async function handleStatusChange(newStatus: string) {
@@ -484,9 +640,12 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
                     </div>
                     <Input type="date" dir="ltr" value={paymentForm.due_date} onChange={(e) => setPaymentForm({ ...paymentForm, due_date: e.target.value })} />
                     <Input placeholder="הערות" value={paymentForm.notes} onChange={(e) => setPaymentForm({ ...paymentForm, notes: e.target.value })} />
+                    {paymentError && <p className="text-xs text-red-400">{paymentError}</p>}
                     <div className="flex gap-2">
-                      <Button variant="outline" size="sm" onClick={() => setAddingPayment(false)}>ביטול</Button>
-                      <Button className="ap-gradient text-white" size="sm" onClick={handleAddPayment} disabled={!paymentForm.amount}>הוסף</Button>
+                      <Button variant="outline" size="sm" onClick={() => { setAddingPayment(false); setPaymentError(null); }}>ביטול</Button>
+                      <Button className="ap-gradient text-white" size="sm" onClick={handleAddPayment} disabled={paymentSaving || !paymentForm.amount}>
+                        {paymentSaving ? "שומר..." : "הוסף"}
+                      </Button>
                     </div>
                   </div>
                 )}
@@ -509,35 +668,13 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
             </div>
 
             {/* Credentials */}
-            <section className="bg-card rounded-2xl border-t-2 border-t-violet-500 border border-border p-4 space-y-3">
-              <h2 className="text-sm font-bold text-violet-400">🔐 גישות מערכות</h2>
-              {credentials.length === 0 ? (
-                <p className="text-sm text-muted-foreground bg-card border border-border rounded-xl p-4">הלקוח טרם מילא גישות</p>
-              ) : (
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                  {credentials.map((cred: { id: string; system_name: string; url?: string; username?: string; password?: string; notes?: string }) => (
-                    <div key={cred.id} className="bg-card border border-border rounded-xl p-4 space-y-2 hover:border-[#1CA9C9]/30 transition-colors">
-                      <div className="flex items-center justify-between">
-                        <span className="font-bold text-sm text-[#1CA9C9]">{cred.system_name}</span>
-                        {cred.url && <a href={cred.url} target="_blank" rel="noreferrer" className="text-xs text-muted-foreground hover:text-foreground" dir="ltr">🔗 פתח</a>}
-                      </div>
-                      {cred.url && <p className="text-[10px] text-muted-foreground" dir="ltr">{cred.url}</p>}
-                      {cred.username && <div className="text-xs"><span className="text-muted-foreground">משתמש: </span><span dir="ltr">{cred.username}</span></div>}
-                      {cred.password && (
-                        <div className="text-xs flex items-center gap-2">
-                          <span className="text-muted-foreground">סיסמה: </span>
-                          <span dir="ltr" className="font-mono">{showPasswords[cred.id] ? cred.password : "••••••••"}</span>
-                          <button onClick={() => setShowPasswords((prev) => ({ ...prev, [cred.id]: !prev[cred.id] }))} className="text-[#1CA9C9] hover:underline text-[10px]">
-                            {showPasswords[cred.id] ? "הסתר" : "הצג"}
-                          </button>
-                        </div>
-                      )}
-                      {cred.notes && <p className="text-[10px] text-muted-foreground">{cred.notes}</p>}
-                    </div>
-                  ))}
-                </div>
-              )}
-            </section>
+            <CredentialsSection
+              credentials={credentials}
+              clientId={client.id}
+              showPasswords={showPasswords}
+              setShowPasswords={setShowPasswords}
+              onRefresh={onRefresh}
+            />
 
             {/* Files */}
             <section className="bg-card rounded-2xl border-t-2 border-t-purple-500 border border-border p-4 space-y-3">

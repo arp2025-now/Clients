@@ -357,3 +357,82 @@ export async function getAuditLog(clientId: string) {
     .limit(50);
   return data ?? [];
 }
+
+// ============================================================
+// CREDENTIALS (ADMIN)
+// ============================================================
+
+export async function addAdminCredential(
+  clientId: string,
+  systemName: string,
+  url: string,
+  username: string,
+  password: string,
+  notes: string
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await requireAdmin();
+    const { encrypt } = await import("@/lib/crypto");
+    const { error } = await supabase.from("credentials").insert({
+      client_id: clientId,
+      system_name: systemName,
+      url: url || null,
+      username: username || null,
+      encrypted_password: password ? encrypt(password) : null,
+      notes: notes || null,
+    });
+    if (error) return { error: error.message };
+    revalidatePath(`/admin/clients/${clientId}`);
+    return { error: null };
+  } catch (e: unknown) {
+    return { error: (e as Error).message };
+  }
+}
+
+export async function updateAdminCredential(
+  credId: string,
+  clientId: string,
+  systemName: string,
+  url: string,
+  username: string,
+  password: string,
+  notes: string
+): Promise<{ error: string | null }> {
+  try {
+    const supabase = await requireAdmin();
+    const { encrypt } = await import("@/lib/crypto");
+
+    // Only re-encrypt if password was actually changed (non-empty)
+    const updateData: Record<string, string | null> = {
+      system_name: systemName,
+      url: url || null,
+      username: username || null,
+      notes: notes || null,
+    };
+    if (password) {
+      updateData.encrypted_password = encrypt(password);
+    }
+
+    const { error } = await supabase
+      .from("credentials")
+      .update(updateData)
+      .eq("id", credId);
+    if (error) return { error: error.message };
+    revalidatePath(`/admin/clients/${clientId}`);
+    return { error: null };
+  } catch (e: unknown) {
+    return { error: (e as Error).message };
+  }
+}
+
+export async function deleteAdminCredential(credId: string, clientId: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await requireAdmin();
+    const { error } = await supabase.from("credentials").delete().eq("id", credId);
+    if (error) return { error: error.message };
+    revalidatePath(`/admin/clients/${clientId}`);
+    return { error: null };
+  } catch (e: unknown) {
+    return { error: (e as Error).message };
+  }
+}
