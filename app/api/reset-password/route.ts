@@ -8,6 +8,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: "Email is required" }, { status: 400 });
   }
 
+  console.log("[reset-password] request for:", email);
+  console.log("[reset-password] BASE_URL:", process.env.NEXT_PUBLIC_BASE_URL);
+  console.log("[reset-password] SERVICE_ROLE_KEY set:", !!process.env.SUPABASE_SERVICE_ROLE_KEY);
+  console.log("[reset-password] RESEND_API_KEY set:", !!process.env.RESEND_API_KEY);
+
   const supabase = createAdminClient();
 
   const { data, error } = await supabase.auth.admin.generateLink({
@@ -19,10 +24,11 @@ export async function POST(req: NextRequest) {
   });
 
   if (error || !data) {
-    // Don't reveal if email exists or not
+    console.error("[reset-password] generateLink error:", error);
     return NextResponse.json({ success: true });
   }
 
+  console.log("[reset-password] link generated OK, sending email...");
   const resetLink = data.properties.action_link;
 
   await sendEmail({

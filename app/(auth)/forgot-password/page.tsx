@@ -9,26 +9,29 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ForgotPasswordPage() {
+  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
   const [sentTo, setSentTo] = useState("");
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
-    e.preventDefault();
-    const formData = new FormData(e.currentTarget);
-    const email = (formData.get("email") as string)?.trim();
-    if (!email) return;
+  async function handleSend() {
+    const trimmed = email.trim();
+    if (!trimmed) {
+      setError("נא להכניס כתובת אימייל.");
+      return;
+    }
 
     setError("");
     setLoading(true);
     try {
-      await fetch("/api/reset-password", {
+      const res = await fetch("/api/reset-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
+        body: JSON.stringify({ email: trimmed }),
       });
-      setSentTo(email);
+      if (!res.ok) throw new Error("server error");
+      setSentTo(trimmed);
       setSent(true);
     } catch {
       setError("שגיאה בשליחה. נסי שוב.");
@@ -66,7 +69,7 @@ export default function ForgotPasswordPage() {
                 </Link>
               </div>
             ) : (
-              <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="space-y-4">
                 {error && (
                   <Alert variant="destructive">
                     <AlertDescription>{error}</AlertDescription>
@@ -76,16 +79,20 @@ export default function ForgotPasswordPage() {
                   <Label htmlFor="email">אימייל</Label>
                   <Input
                     id="email"
-                    name="email"
-                    type="email"
+                    type="text"
+                    inputMode="email"
                     dir="ltr"
                     placeholder="your@email.com"
                     autoComplete="email"
                     autoFocus
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
+                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
                   />
                 </div>
                 <Button
-                  type="submit"
+                  type="button"
+                  onClick={handleSend}
                   className="w-full ap-gradient text-white font-semibold"
                   disabled={loading}
                 >
@@ -97,7 +104,7 @@ export default function ForgotPasswordPage() {
                 >
                   חזרה לכניסה
                 </Link>
-              </form>
+              </div>
             )}
           </CardContent>
         </Card>

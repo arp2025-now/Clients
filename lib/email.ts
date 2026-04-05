@@ -24,6 +24,6 @@ export async function sendEmail({ to, subject, html }: EmailParams): Promise<voi
       html,
     });
   } catch (err) {
-    console.error("[email] Failed to send:", err);
+    console.error("[email] Failed to send:", JSON.stringify(err));
   }
 }
