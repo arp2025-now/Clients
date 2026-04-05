@@ -9,13 +9,17 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
   const [loading, setLoading] = useState(false);
   const [sent, setSent] = useState(false);
+  const [sentTo, setSentTo] = useState("");
   const [error, setError] = useState("");
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const email = (formData.get("email") as string)?.trim();
+    if (!email) return;
+
     setError("");
     setLoading(true);
     try {
@@ -24,6 +28,7 @@ export default function ForgotPasswordPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email }),
       });
+      setSentTo(email);
       setSent(true);
     } catch {
       setError("שגיאה בשליחה. נסי שוב.");
@@ -53,7 +58,7 @@ export default function ForgotPasswordPage() {
               <div className="text-center py-4 space-y-4">
                 <div className="text-5xl">📧</div>
                 <p className="text-sm text-muted-foreground">
-                  שלחנו קישור לאיפוס סיסמה לכתובת <strong>{email}</strong>.<br />
+                  שלחנו קישור לאיפוס סיסמה לכתובת <strong>{sentTo}</strong>.<br />
                   בדקי את תיבת הדואר.
                 </p>
                 <Link href="/login" className="block text-sm text-[#1CA9C9] hover:underline">
@@ -71,12 +76,11 @@ export default function ForgotPasswordPage() {
                   <Label htmlFor="email">אימייל</Label>
                   <Input
                     id="email"
+                    name="email"
                     type="email"
                     dir="ltr"
                     placeholder="your@email.com"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    required
+                    autoComplete="email"
                     autoFocus
                   />
                 </div>
