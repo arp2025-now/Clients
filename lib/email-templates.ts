@@ -1,4 +1,4 @@
-const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://ap-clients-portal.vercel.app";
+const BASE_URL = process.env.NEXT_PUBLIC_BASE_URL ?? "https://clients-green-seven.vercel.app";
 
 function layout(content: string): string {
   return `<!DOCTYPE html>

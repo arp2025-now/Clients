@@ -43,7 +43,7 @@ export default async function DashboardPage() {
     { data: activity },
   ] = await Promise.all([
     supabase.from("clients").select("*").eq("user_id", user.id).single(),
-    supabase.from("projects").select("*").order("created_at"),
+    supabase.from("projects").select("*").order("created_at", { ascending: false }),
     supabase.from("tickets").select("*").in("status", ["open", "in_progress"]).order("created_at", { ascending: false }),
     supabase.from("client_files").select("id").limit(100),
     supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(8),

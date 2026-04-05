@@ -19,7 +19,7 @@ export async function POST(req: NextRequest) {
 
   const supabase = createAdminClient();
   const { data, error } = await supabase.auth.admin.inviteUserByEmail(email, {
-    redirectTo: `${process.env.NEXT_PUBLIC_SITE_URL}/auth/callback?next=/onboarding`,
+    redirectTo: `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback?next=/onboarding`,
     data: { business_name: businessName ?? "" },
   });
 
