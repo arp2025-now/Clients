@@ -31,10 +31,11 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Public routes
-  if (pathname === "/login" || pathname.startsWith("/auth")) {
-    // If already logged in, redirect to appropriate dashboard
-    if (user) {
+  // Public routes — always accessible
+  const publicPaths = ["/login", "/onboarding", "/auth/callback", "/reset-password"];
+  if (publicPaths.some((p) => pathname.startsWith(p))) {
+    // If already logged in and trying to access /login — redirect to the right place
+    if (pathname === "/login" && user) {
       const isAdmin = user.email === process.env.ADMIN_EMAIL;
       return NextResponse.redirect(
         new URL(isAdmin ? "/admin" : "/dashboard", request.url)
@@ -43,22 +44,30 @@ export async function proxy(request: NextRequest) {
     return supabaseResponse;
   }
 
-  // Protected: require auth
+  // Not logged in — send to login
   if (!user) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // Admin-only routes
+  // /admin routes — only for admin
   if (pathname.startsWith("/admin")) {
     if (user.email !== process.env.ADMIN_EMAIL) {
       return NextResponse.redirect(new URL("/dashboard", request.url));
     }
   }
 
+  // /dashboard, /tickets, /documents, /payments — only for non-admin clients
+  const clientPaths = ["/dashboard", "/tickets", "/documents", "/payments"];
+  if (clientPaths.some((p) => pathname.startsWith(p))) {
+    if (user.email === process.env.ADMIN_EMAIL) {
+      return NextResponse.redirect(new URL("/admin", request.url));
+    }
+  }
+
   return supabaseResponse;
 }
 
-export const config = {
+export const proxyConfig = {
   matcher: [
     "/((?!_next/static|_next/image|favicon.ico|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)",
   ],
