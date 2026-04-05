@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { getLoginRedirect } from "./actions";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -36,14 +35,7 @@ export default function LoginPage() {
       return;
     }
 
-    try {
-      const redirect = await getLoginRedirect();
-      router.push(redirect);
-      router.refresh();
-    } catch {
-      setError("שגיאה בכניסה. נסי שוב.");
-      setLoading(false);
-    }
+    router.push("/dashboard");
   }
 
   async function handleForgot(e: React.FormEvent) {
