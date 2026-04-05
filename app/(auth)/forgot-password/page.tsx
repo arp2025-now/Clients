@@ -83,7 +83,7 @@ export default function ForgotPasswordPage() {
                 <Button
                   type="submit"
                   className="w-full ap-gradient text-white font-semibold"
-                  disabled={loading || !email}
+                  disabled={loading}
                 >
                   {loading ? "שולחת..." : "שלחי קישור לאיפוס"}
                 </Button>
