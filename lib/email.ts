@@ -18,7 +18,7 @@ export async function sendEmail({ to, subject, html }: EmailParams): Promise<voi
       return;
     }
     await resend.emails.send({
-      from: "AP Automations <noreply@apauto.co.il>",
+      from: "AP Automations <noreply@apautomatebiz.com>",
       to,
       subject,
       html,
