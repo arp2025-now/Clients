@@ -32,7 +32,7 @@ export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
   // Public routes — always accessible
-  const publicPaths = ["/login", "/onboarding", "/auth/callback", "/reset-password"];
+  const publicPaths = ["/login", "/forgot-password", "/onboarding", "/auth/callback", "/reset-password"];
   if (publicPaths.some((p) => pathname.startsWith(p))) {
     // If already logged in and trying to access /login — redirect to the right place
     if (pathname === "/login" && user) {
