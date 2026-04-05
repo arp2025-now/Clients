@@ -3,6 +3,13 @@
 import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { decrypt } from "@/lib/crypto";
 import { revalidatePath } from "next/cache";
+import { sendEmail } from "@/lib/email";
+import {
+  ticketCreatedAdminEmail,
+  ticketStatusChangedClientEmail,
+  adminCommentClientEmail,
+  clientCommentAdminEmail,
+} from "@/lib/email-templates";
 
 // Verify caller is admin using the user-facing client (has auth cookies),
 // then return the admin client (service role) for DB/Storage operations.
@@ -54,6 +61,22 @@ export async function updateProjectProgress(projectId: string, status: string, p
     .eq("id", projectId);
   if (error) throw new Error(error.message);
   revalidatePath("/admin");
+}
+
+export async function deleteProject(projectId: string, clientId: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await requireAdmin();
+    const { error } = await supabase
+      .from("projects")
+      .delete()
+      .eq("id", projectId);
+    if (error) return { error: error.message };
+    revalidatePath(`/admin/clients/${clientId}`);
+    revalidatePath("/admin");
+    return { error: null };
+  } catch (e: unknown) {
+    return { error: (e as Error).message };
+  }
 }
 
 export async function addProject(clientId: string, name: string, description: string) {
@@ -134,33 +157,42 @@ export async function updateClientNotes(clientId: string, notes: string) {
 export async function uploadClientFile(formData: FormData): Promise<{ error: string | null }> {
   const supabase = await requireAdmin();
 
-  const file = formData.get("file") as File;
-  const clientId = formData.get("clientId") as string;
-  const fileType = formData.get("fileType") as string;
+  const file        = formData.get("file")        as File;
+  const clientId    = formData.get("clientId")    as string;
+  const fileType    = formData.get("fileType")    as string;
+  const displayName = (formData.get("displayName") as string | null)?.trim() || null;
+  const note        = (formData.get("note")        as string | null)?.trim() || null;
+  const tagsRaw     = formData.get("tags") as string | null;
+  const tags        = tagsRaw ? tagsRaw.split(",").map((t) => t.trim()).filter(Boolean) : [];
 
   if (!file || !clientId) return { error: "Missing file or clientId" };
 
-  // Sanitize filename for storage path (keep original name for display)
   const ext = file.name.split(".").pop() ?? "";
   const safeName = file.name
-    .replace(/\.[^.]+$/, "") // remove extension
-    .replace(/[^\w\-]/g, "_") // replace non-ASCII (Hebrew, spaces, etc.) with _
-    .replace(/_+/g, "_") // collapse consecutive underscores
-    .slice(0, 60); // limit length
+    .replace(/\.[^.]+$/, "")
+    .replace(/[^\w\-]/g, "_")
+    .replace(/_+/g, "_")
+    .slice(0, 60);
   const storagePath = `${clientId}/${Date.now()}_${safeName}.${ext}`;
 
   const { error: uploadError } = await supabase.storage
     .from("client-files")
-    .upload(storagePath, file, {
-      contentType: file.type,
-      upsert: false,
-    });
+    .upload(storagePath, file, { contentType: file.type, upsert: false });
 
   if (uploadError) return { error: `Storage: ${uploadError.message}` };
 
   const { error: dbError } = await supabase
     .from("client_files")
-    .insert({ client_id: clientId, filename: file.name, storage_path: storagePath, file_type: fileType, size_bytes: file.size });
+    .insert({
+      client_id:    clientId,
+      filename:     file.name,
+      display_name: displayName,
+      note,
+      tags,
+      storage_path: storagePath,
+      file_type:    fileType,
+      size_bytes:   file.size,
+    });
 
   if (dbError) {
     await supabase.storage.from("client-files").remove([storagePath]);
@@ -224,13 +256,37 @@ export async function addAdminTicketComment(
     });
     if (error) return { error: error.message };
 
-    // Create in-app notification for client
+    // Fetch ticket subject + client email for notification
+    const [{ data: ticket }, { data: clientRow }] = await Promise.all([
+      supabase.from("tickets").select("subject").eq("id", ticketId).single(),
+      supabase
+        .from("clients")
+        .select("id, business_name, user_id")
+        .eq("id", clientId)
+        .single(),
+    ]);
+
+    // In-app notification
     await createNotification(
       clientId,
       "תגובה חדשה על הטיקט שלך",
       body.trim().slice(0, 80),
       "/tickets"
     );
+
+    // Email notification to client
+    if (clientRow && ticket) {
+      const { data: authUser } = await supabase.auth.admin.getUserById(clientRow.user_id);
+      const clientEmail = authUser?.user?.email;
+      if (clientEmail) {
+        const tmpl = adminCommentClientEmail({
+          clientName:  clientRow.business_name,
+          subject:     ticket.subject,
+          commentBody: body.trim(),
+        });
+        await sendEmail({ to: clientEmail, ...tmpl });
+      }
+    }
 
     // Audit log
     await supabase.from("audit_log").insert({
@@ -335,6 +391,25 @@ export async function updateTicketStatusWithAudit(
     `"${subject}" שונה מ-${prevStatus} ל-${status}`,
     "/tickets"
   );
+
+  // Email notification to client
+  const { data: clientRow } = await supabase
+    .from("clients")
+    .select("business_name, user_id")
+    .eq("id", clientId)
+    .single();
+  if (clientRow) {
+    const { data: authUser } = await supabase.auth.admin.getUserById(clientRow.user_id);
+    const clientEmail = authUser?.user?.email;
+    if (clientEmail) {
+      const tmpl = ticketStatusChangedClientEmail({
+        clientName: clientRow.business_name,
+        subject,
+        newStatus: status,
+      });
+      await sendEmail({ to: clientEmail, ...tmpl });
+    }
+  }
 
   // Make.com webhook
   const webhookUrl = process.env.MAKE_WEBHOOK_URL;
@@ -446,4 +521,101 @@ export async function deleteAdminCredential(credId: string, clientId: string): P
   } catch (e: unknown) {
     return { error: (e as Error).message };
   }
+}
+
+// ============================================================
+// SEARCH (Feature 4)
+// ============================================================
+
+export async function searchAll(query: string) {
+  if (!query.trim()) return { clients: [], tickets: [], files: [] };
+  const supabase = await requireAdmin();
+  const q = `%${query.trim()}%`;
+
+  const [clientsRes, ticketsRes, filesRes] = await Promise.all([
+    supabase
+      .from("clients")
+      .select("id, business_name, phone, status")
+      .or(`business_name.ilike.${q},phone.ilike.${q}`)
+      .limit(10),
+    supabase
+      .from("tickets")
+      .select("id, subject, status, client_id, clients(business_name)")
+      .or(`subject.ilike.${q},description.ilike.${q}`)
+      .limit(10),
+    supabase
+      .from("client_files")
+      .select("id, filename, display_name, client_id, clients(business_name)")
+      .or(`filename.ilike.${q},note.ilike.${q},display_name.ilike.${q}`)
+      .limit(10),
+  ]);
+
+  return {
+    clients: clientsRes.data ?? [],
+    tickets: ticketsRes.data ?? [],
+    files:   filesRes.data   ?? [],
+  };
+}
+
+// ============================================================
+// CSV EXPORT (Feature 5)
+// ============================================================
+
+function toCSV(rows: Record<string, unknown>[]): string {
+  if (!rows.length) return "";
+  const headers = Object.keys(rows[0]);
+  const escape = (v: unknown) => {
+    const s = v == null ? "" : String(v).replace(/"/g, '""');
+    return `"${s}"`;
+  };
+  return [
+    headers.map(escape).join(","),
+    ...rows.map((r) => headers.map((h) => escape(r[h])).join(",")),
+  ].join("\r\n");
+}
+
+export async function exportClientsCSV(): Promise<string> {
+  const supabase = await requireAdmin();
+  const { data } = await supabase
+    .from("clients")
+    .select("id, business_name, phone, website_url, status, created_at")
+    .order("created_at", { ascending: false });
+  return toCSV((data ?? []) as Record<string, unknown>[]);
+}
+
+export async function exportTicketsCSV(status?: string): Promise<string> {
+  const supabase = await requireAdmin();
+  let q = supabase
+    .from("tickets")
+    .select("id, subject, priority, status, description, created_at, updated_at, clients(business_name)");
+  if (status) q = q.eq("status", status);
+  const { data } = await q.order("created_at", { ascending: false });
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const rows = (data ?? []).map((t: any) => ({
+    id:          t.id,
+    client_name: Array.isArray(t.clients) ? (t.clients[0]?.business_name ?? "") : (t.clients?.business_name ?? ""),
+    subject:     t.subject,
+    priority:    t.priority,
+    status:      t.status,
+    description: t.description,
+    created_at:  t.created_at,
+    updated_at:  t.updated_at,
+  }));
+  return toCSV(rows);
+}
+
+export async function exportClientFilesCSV(clientId: string): Promise<string> {
+  const supabase = await requireAdmin();
+  const { data } = await supabase
+    .from("client_files")
+    .select("id, filename, display_name, tags, note, file_type, uploaded_by, size_bytes, uploaded_at")
+    .eq("client_id", clientId)
+    .order("uploaded_at", { ascending: false });
+
+  const rows = (data ?? []).map((f: Record<string, unknown> & { tags?: string[] | null }) => ({
+    ...f,
+    tags: (f.tags ?? []).join("; "),
+  }));
+  return toCSV(rows as Record<string, unknown>[]);
 }

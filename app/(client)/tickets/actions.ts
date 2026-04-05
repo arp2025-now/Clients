@@ -1,7 +1,9 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { revalidatePath } from "next/cache";
+import { sendEmail } from "@/lib/email";
+import { clientCommentAdminEmail } from "@/lib/email-templates";
 
 export async function getTicketComments(ticketId: string) {
   const supabase = await createClient();
@@ -26,6 +28,24 @@ export async function addTicketComment(ticketId: string, body: string): Promise<
       body: body.trim(),
     });
     if (error) return { error: error.message };
+
+    // Email admin
+    const adminEmail = process.env.ADMIN_EMAIL;
+    if (adminEmail) {
+      const admin = createAdminClient();
+      const [{ data: ticket }, { data: client }] = await Promise.all([
+        admin.from("tickets").select("subject").eq("id", ticketId).single(),
+        admin.from("clients").select("business_name").eq("user_id", user.id).single(),
+      ]);
+      if (ticket && client) {
+        const tmpl = clientCommentAdminEmail({
+          clientName:  client.business_name,
+          subject:     ticket.subject,
+          commentBody: body.trim(),
+        });
+        await sendEmail({ to: adminEmail, ...tmpl });
+      }
+    }
 
     revalidatePath("/tickets");
     return { error: null };

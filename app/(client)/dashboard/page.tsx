@@ -1,4 +1,4 @@
-import { createClient, createAdminClient } from "@/lib/supabase/server";
+import { createClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 import { StatusBadge, PriorityBadge } from "@/components/dashboard/StatusBadge";
 import { Progress } from "@/components/ui/progress";
@@ -35,8 +35,6 @@ export default async function DashboardPage() {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) redirect("/login");
 
-  const admin = createAdminClient();
-
   const [
     { data: client },
     { data: projects },
@@ -59,7 +57,7 @@ export default async function DashboardPage() {
   const liveCount = projects?.filter((p) => p.status === "live").length ?? 0;
 
   return (
-    <div className="p-6 space-y-6 max-w-5xl mx-auto w-full">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto w-full">
       {/* Welcome banner */}
       <div
         className="relative overflow-hidden rounded-2xl p-6"
@@ -75,7 +73,7 @@ export default async function DashboardPage() {
               ברוכים הבאים לפורטל AP Automations
             </p>
           </div>
-          <div className="text-5xl font-black ap-gradient-text leading-none flex-shrink-0">
+          <div className="text-3xl sm:text-5xl font-black ap-gradient-text leading-none flex-shrink-0">
             {avgProgress}%
           </div>
         </div>
@@ -86,7 +84,7 @@ export default async function DashboardPage() {
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-4">
+      <div className="grid grid-cols-3 gap-2 sm:gap-4">
         <div className="bg-card border border-border rounded-2xl p-4 space-y-1">
           <p className="text-[11px] uppercase tracking-wider text-muted-foreground">פרויקטים</p>
           <p className="text-3xl font-black text-[#1CA9C9]">{projects?.length ?? 0}</p>

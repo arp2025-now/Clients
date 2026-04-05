@@ -160,7 +160,7 @@ export function TicketsList({ tickets, clientId }: { tickets: Ticket[]; clientId
   const [modalOpen, setModalOpen] = useState(false);
 
   return (
-    <div className="p-6 space-y-5 max-w-2xl">
+    <div className="p-4 sm:p-6 space-y-4 sm:space-y-5 max-w-2xl">
       <div className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold">הטיקטים שלי</h1>

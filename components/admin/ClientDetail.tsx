@@ -26,6 +26,8 @@ import {
   addAdminCredential,
   updateAdminCredential,
   deleteAdminCredential,
+  exportClientFilesCSV,
+  deleteProject,
 } from "@/app/(admin)/admin/actions";
 
 const PAYMENT_BADGE: Record<string, string> = {
@@ -56,6 +58,15 @@ const FILE_TYPE_STYLES: Record<string, string> = {
   contract: "bg-purple-500/15 text-purple-400 border-purple-500/20",
   spec:     "bg-blue-500/15 text-blue-400 border-blue-500/20",
   other:    "bg-gray-500/15 text-gray-400 border-gray-500/20",
+};
+
+const TAGS_OPTIONS = ["חוזה", "מפרט", "חשבונית", "כללי"];
+
+const TAG_STYLES: Record<string, string> = {
+  "חוזה":    "bg-purple-500/15 text-purple-400 border-purple-500/20",
+  "מפרט":    "bg-blue-500/15 text-blue-400 border-blue-500/20",
+  "חשבונית": "bg-green-500/15 text-green-400 border-green-500/20",
+  "כללי":    "bg-gray-500/15 text-gray-400 border-gray-500/20",
 };
 
 const TICKET_STATUS_LABELS: Record<string, string> = {
@@ -206,7 +217,7 @@ function TicketRow({ ticket, clientId, onRefresh }: { ticket: any; clientId: str
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-function ProjectRow({ p, onRefresh }: { p: any; onRefresh: () => void }) {
+function ProjectRow({ p, clientId, onRefresh }: { p: any; clientId: string; onRefresh: () => void }) {
   const imgInputRef = useRef<HTMLInputElement>(null);
   const [uploadingImg, setUploadingImg] = useState(false);
   const [previewUrl, setPreviewUrl] = useState<string | null>(p.image_url ?? null);
@@ -263,7 +274,20 @@ function ProjectRow({ p, onRefresh }: { p: any; onRefresh: () => void }) {
       <div className="p-4 space-y-3">
         <div className="flex items-center justify-between">
           <span className="font-semibold text-sm">{p.name}</span>
-          <StatusBadge status={currentStatus} />
+          <div className="flex items-center gap-2">
+            <StatusBadge status={currentStatus} />
+            <button
+              onClick={async () => {
+                if (!confirm(`למחוק את הפרויקט "${p.name}"?`)) return;
+                await deleteProject(p.id, clientId);
+                onRefresh();
+              }}
+              className="text-muted-foreground hover:text-destructive text-xs transition-colors"
+              title="מחק פרויקט"
+            >
+              ✕
+            </button>
+          </div>
         </div>
         {p.description && <p className="text-xs text-muted-foreground">{p.description}</p>}
         {/* Progress bar + % — updates in real time as slider moves */}
@@ -439,6 +463,11 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
 
   const [uploading, setUploading] = useState(false);
   const [uploadFileType, setUploadFileType] = useState<"contract" | "spec" | "other">("other");
+  const [uploadDisplayName, setUploadDisplayName] = useState("");
+  const [uploadNote, setUploadNote] = useState("");
+  const [uploadTags, setUploadTags] = useState<string[]>([]);
+  const [showUploadForm, setShowUploadForm] = useState(false);
+  const [fileFilterTag, setFileFilterTag] = useState<string | null>(null);
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [paymentError, setPaymentError] = useState<string | null>(null);
   const [paymentSaving, setPaymentSaving] = useState(false);
@@ -498,15 +527,36 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
       formData.append("file", file);
       formData.append("clientId", client.id);
       formData.append("fileType", uploadFileType);
+      if (uploadDisplayName) formData.append("displayName", uploadDisplayName);
+      if (uploadNote)        formData.append("note", uploadNote);
+      if (uploadTags.length) formData.append("tags", uploadTags.join(","));
       const result = await uploadClientFile(formData);
-      if (result.error) alert("שגיאה בהעלאת הקובץ: " + result.error);
-      else router.refresh();
+      if (result.error) {
+        alert("שגיאה בהעלאת הקובץ: " + result.error);
+      } else {
+        setShowUploadForm(false);
+        setUploadDisplayName("");
+        setUploadNote("");
+        setUploadTags([]);
+        router.refresh();
+      }
     } catch (err) {
       alert("שגיאה: " + (err instanceof Error ? err.message : String(err)));
     } finally {
       setUploading(false);
       if (fileInputRef.current) fileInputRef.current.value = "";
     }
+  }
+
+  async function handleExportFiles() {
+    const csv = await exportClientFilesCSV(client.id);
+    const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `קבצים_${client.business_name}_${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
   }
 
   async function handleDownload(fileId: string, storagePath: string, filename: string) {
@@ -558,7 +608,7 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
         </div>
       </div>
 
-      <div className="p-6 space-y-6 max-w-5xl">
+      <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl">
         {/* Client header card */}
         <div className="rounded-2xl p-5 flex items-start justify-between gap-4"
           style={{ background: "linear-gradient(135deg, rgba(28,169,201,0.10) 0%, rgba(66,152,166,0.06) 100%)", border: "1px solid rgba(28,169,201,0.2)" }}>
@@ -620,7 +670,7 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
                 )}
                 <div className="space-y-3">
                   {projects.map((p: { id: string; name: string; description?: string; status: string; progress_pct: number; image_url?: string }) => (
-                    <ProjectRow key={p.id} p={p} onRefresh={onRefresh} />
+                    <ProjectRow key={p.id} p={p} clientId={client.id} onRefresh={onRefresh} />
                   ))}
                 </div>
               </section>
@@ -633,7 +683,7 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
                 </div>
                 {addingPayment && (
                   <div className="bg-card border border-[#1CA9C9]/30 rounded-xl p-4 space-y-3">
-                    <div className="grid grid-cols-2 gap-2">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
                       <div>
                         <Label className="text-xs">סכום (₪)</Label>
                         <Input type="number" placeholder="3500" dir="ltr" value={paymentForm.amount} onChange={(e) => setPaymentForm({ ...paymentForm, amount: e.target.value })} />
@@ -690,35 +740,101 @@ export function ClientDetail({ client, projects, payments, files, credentials, t
               <div className="flex items-center justify-between">
                 <h2 className="text-sm font-bold text-purple-400">📎 קבצים ומסמכים</h2>
                 <div className="flex items-center gap-2">
-                  <select value={uploadFileType} onChange={(e) => setUploadFileType(e.target.value as "contract" | "spec" | "other")} className="bg-secondary border border-border rounded-lg px-2 py-1 text-xs">
-                    <option value="contract">חוזה</option>
-                    <option value="spec">אפיון</option>
-                    <option value="other">אחר</option>
-                  </select>
-                  <Button size="sm" variant="outline" onClick={() => fileInputRef.current?.click()} disabled={uploading} className="text-xs">
-                    {uploading ? "מעלה..." : "+ העלה קובץ"}
+                  {files.length > 0 && (
+                    <Button size="sm" variant="ghost" onClick={handleExportFiles} className="text-xs h-7 px-2 text-muted-foreground">
+                      ↓ ייצא CSV
+                    </Button>
+                  )}
+                  <Button size="sm" variant="outline" onClick={() => setShowUploadForm((v) => !v)} disabled={uploading} className="text-xs">
+                    {showUploadForm ? "ביטול" : "+ העלה קובץ"}
                   </Button>
-                  <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept=".pdf,.doc,.docx,.xls,.xlsx,.png,.jpg,.jpeg,.zip" />
+                  <input ref={fileInputRef} type="file" className="hidden" onChange={handleFileUpload} accept="*/*" />
                 </div>
               </div>
+
+              {/* Upload form */}
+              {showUploadForm && (
+                <div className="bg-card border border-purple-500/20 rounded-xl p-4 space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">סוג קובץ</label>
+                      <select value={uploadFileType} onChange={(e) => setUploadFileType(e.target.value as "contract" | "spec" | "other")} className="w-full bg-secondary border border-border rounded-lg px-2 py-1 text-xs">
+                        <option value="contract">חוזה</option>
+                        <option value="spec">אפיון</option>
+                        <option value="other">אחר</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-xs text-muted-foreground block mb-1">שם תצוגה</label>
+                      <input type="text" value={uploadDisplayName} onChange={(e) => setUploadDisplayName(e.target.value)} placeholder="אופציונלי" className="w-full bg-input border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-purple-500/50" dir="rtl" />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">הערה</label>
+                    <input type="text" value={uploadNote} onChange={(e) => setUploadNote(e.target.value)} placeholder="הערה קצרה..." className="w-full bg-input border border-border rounded-lg px-2 py-1 text-xs focus:outline-none focus:border-purple-500/50" dir="rtl" />
+                  </div>
+                  <div>
+                    <label className="text-xs text-muted-foreground block mb-1">תגיות</label>
+                    <div className="flex flex-wrap gap-1.5">
+                      {TAGS_OPTIONS.map((tag) => (
+                        <button key={tag} type="button"
+                          onClick={() => setUploadTags((prev) => prev.includes(tag) ? prev.filter((t) => t !== tag) : [...prev, tag])}
+                          className={`px-2 py-0.5 rounded-full border text-xs transition-all ${uploadTags.includes(tag) ? "bg-purple-500/20 border-purple-500 text-purple-400" : "border-border text-muted-foreground hover:border-purple-500/40"}`}>
+                          {tag}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                  <Button size="sm" className="ap-gradient text-white w-full text-xs" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    {uploading ? "מעלה..." : "בחר קובץ והעלה"}
+                  </Button>
+                </div>
+              )}
+
+              {/* Tag filter */}
+              {files.length > 0 && (() => {
+                const allTags: string[] = Array.from(new Set(files.flatMap((f: { tags?: string[] | null }) => f.tags ?? [])));
+                return allTags.length > 0 ? (
+                  <div className="flex flex-wrap gap-1.5 items-center">
+                    <span className="text-[10px] text-muted-foreground">סינון:</span>
+                    <button onClick={() => setFileFilterTag(null)} className={`px-2 py-0.5 rounded-full border text-[10px] transition-all ${fileFilterTag === null ? "bg-purple-500/20 border-purple-500 text-purple-400" : "border-border text-muted-foreground"}`}>הכל</button>
+                    {allTags.map((tag: string) => (
+                      <button key={tag} onClick={() => setFileFilterTag(fileFilterTag === tag ? null : tag)} className={`px-2 py-0.5 rounded-full border text-[10px] transition-all ${fileFilterTag === tag ? "bg-purple-500/20 border-purple-500 text-purple-400" : "border-border text-muted-foreground"}`}>{tag}</button>
+                    ))}
+                  </div>
+                ) : null;
+              })()}
+
+              {/* File list */}
               {files.length === 0 ? (
                 <div className="bg-card border border-dashed border-border rounded-xl p-6 text-center text-muted-foreground text-sm">
                   <p className="text-2xl mb-2">📎</p><p>אין קבצים עדיין</p>
                 </div>
               ) : (
                 <div className="space-y-2">
-                  {files.map((f: { id: string; filename: string; storage_path: string; file_type: string; size_bytes: number; uploaded_at: string }) => (
-                    <div key={f.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-3 hover:border-purple-500/30 transition-colors">
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xl flex-shrink-0">{f.file_type === "contract" ? "📄" : f.file_type === "spec" ? "📋" : "📎"}</span>
+                  {files
+                    .filter((f: { tags?: string[] | null }) => !fileFilterTag || (f.tags ?? []).includes(fileFilterTag))
+                    .map((f: { id: string; filename: string; display_name?: string | null; note?: string | null; tags?: string[] | null; storage_path: string; file_type: string; size_bytes: number; uploaded_at: string }) => (
+                    <div key={f.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-start justify-between gap-3 hover:border-purple-500/30 transition-colors">
+                      <div className="flex items-start gap-3 min-w-0">
+                        <span className="text-xl flex-shrink-0 mt-0.5">{f.file_type === "contract" ? "📄" : f.file_type === "spec" ? "📋" : "📎"}</span>
                         <div className="min-w-0">
-                          <p className="text-sm font-medium truncate">{f.filename}</p>
+                          <p className="text-sm font-medium truncate">{f.display_name || f.filename}</p>
+                          {f.display_name && <p className="text-[10px] text-muted-foreground truncate">{f.filename}</p>}
                           <p className="text-[10px] text-muted-foreground">{formatBytes(f.size_bytes)} · {new Date(f.uploaded_at).toLocaleDateString("he-IL")}</p>
+                          {f.note && <p className="text-[10px] text-muted-foreground mt-0.5 bg-muted/40 rounded px-1.5 py-0.5 inline-block">{f.note}</p>}
+                          {f.tags && f.tags.length > 0 && (
+                            <div className="flex flex-wrap gap-1 mt-1">
+                              {f.tags.map((tag: string) => (
+                                <span key={tag} className={`text-[10px] px-1.5 py-0.5 rounded-full border ${TAG_STYLES[tag] ?? "bg-gray-500/15 text-gray-400 border-gray-500/20"}`}>{tag}</span>
+                              ))}
+                            </div>
+                          )}
                         </div>
                       </div>
-                      <div className="flex items-center gap-2 flex-shrink-0">
+                      <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
                         <Badge variant="outline" className={`text-[10px] px-2 ${FILE_TYPE_STYLES[f.file_type]}`}>{FILE_TYPE_LABELS[f.file_type]}</Badge>
-                        <Button size="sm" variant="ghost" onClick={() => handleDownload(f.id, f.storage_path, f.filename)} disabled={downloadingId === f.id} className="text-xs h-7 px-2">
+                        <Button size="sm" variant="ghost" onClick={() => handleDownload(f.id, f.storage_path, f.display_name || f.filename)} disabled={downloadingId === f.id} className="text-xs h-7 px-2">
                           {downloadingId === f.id ? "..." : "הורד"}
                         </Button>
                         <button onClick={() => handleDeleteFile(f.id, f.storage_path)} className="text-muted-foreground hover:text-destructive text-xs">✕</button>

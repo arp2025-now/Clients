@@ -7,6 +7,8 @@ import { StatusBadge, PriorityBadge } from "@/components/dashboard/StatusBadge";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { updateTicketStatus } from "@/app/(admin)/admin/actions";
+import { AdminSearch } from "@/components/admin/AdminSearch";
+import { ExportButton } from "@/components/admin/ExportButton";
 
 const PAYMENT_BADGE: Record<string, { label: string; class: string }> = {
   paid:    { label: "שולם",   class: "bg-green-500/15 text-green-400 border-green-500/20" },
@@ -84,12 +86,15 @@ export function AdminDashboard({ clients, openTickets, totalRevenue = 0, recentA
   const totalOpenTickets = openTickets.length;
 
   return (
-    <div className="p-6 space-y-8 max-w-5xl">
+    <div className="p-4 sm:p-6 space-y-6 sm:space-y-8 max-w-5xl">
       {/* Header */}
       <div className="flex items-start justify-between gap-6">
         <div>
           <h1 className="text-2xl font-black ap-gradient-text">AP Automations</h1>
           <p className="text-sm text-muted-foreground mt-0.5">לוח בקרה פנימי</p>
+          <div className="mt-3">
+            <AdminSearch />
+          </div>
         </div>
         {/* Invite form — card style */}
         <div className="bg-card border border-border rounded-xl p-4 space-y-3 w-72 flex-shrink-0">
@@ -140,10 +145,13 @@ export function AdminDashboard({ clients, openTickets, totalRevenue = 0, recentA
 
       {/* Clients grid */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-          <span className="w-1 h-4 rounded-full ap-gradient inline-block" />
-          לקוחות ({clients.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <span className="w-1 h-4 rounded-full ap-gradient inline-block" />
+            לקוחות ({clients.length})
+          </h2>
+          <ExportButton type="clients" label="↓ ייצא לקוחות" />
+        </div>
         {clients.length === 0 ? (
           <p className="text-muted-foreground text-sm">אין לקוחות עדיין</p>
         ) : (
@@ -221,10 +229,13 @@ export function AdminDashboard({ clients, openTickets, totalRevenue = 0, recentA
 
       {/* Open tickets */}
       <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-          <span className="w-1 h-4 rounded-full bg-yellow-500 inline-block" />
-          טיקטים פתוחים ({openTickets.length})
-        </h2>
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
+            <span className="w-1 h-4 rounded-full bg-yellow-500 inline-block" />
+            טיקטים פתוחים ({openTickets.length})
+          </h2>
+          <ExportButton type="tickets" label="↓ ייצא טיקטים" />
+        </div>
         {openTickets.length === 0 ? (
           <p className="text-muted-foreground text-sm">אין טיקטים פתוחים ✓</p>
         ) : (
