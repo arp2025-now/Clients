@@ -35,7 +35,8 @@ export async function POST(req: NextRequest) {
   }
 
   // Build link directly with hashed_token — bypasses Supabase redirect (which adds hash fragments the server can't read)
-  const inviteLink = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback?token_hash=${data.properties.hashed_token}&type=invite&next=/onboarding`;
+  const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://clients-green-seven.vercel.app";
+  const inviteLink = `${baseUrl}/auth/callback?token_hash=${data.properties.hashed_token}&type=invite&next=/onboarding`;
   const name = businessName || email;
 
   // Send invite email via Resend
