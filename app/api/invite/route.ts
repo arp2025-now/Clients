@@ -34,7 +34,8 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  const inviteLink = data.properties.action_link;
+  // Build link directly with hashed_token — bypasses Supabase redirect (which adds hash fragments the server can't read)
+  const inviteLink = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback?token_hash=${data.properties.hashed_token}&type=invite&next=/onboarding`;
   const name = businessName || email;
 
   // Send invite email via Resend

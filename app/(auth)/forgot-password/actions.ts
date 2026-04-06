@@ -29,7 +29,8 @@ export async function resetPasswordAction(
     return { success: true, email };
   }
 
-  const resetLink = data.properties.action_link;
+  // Build link directly with hashed_token — bypasses Supabase redirect (which uses hash fragments the server can't read)
+  const resetLink = `${process.env.NEXT_PUBLIC_BASE_URL}/auth/callback?token_hash=${data.properties.hashed_token}&type=recovery&next=/reset-password`;
   console.log("[reset-password] link generated, sending email...");
 
   await sendEmail({
