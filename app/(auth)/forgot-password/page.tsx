@@ -1,44 +1,16 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { resetPasswordAction } from "./actions";
 
 export default function ForgotPasswordPage() {
-  const [email, setEmail] = useState("");
-  const [loading, setLoading] = useState(false);
-  const [sent, setSent] = useState(false);
-  const [sentTo, setSentTo] = useState("");
-  const [error, setError] = useState("");
-
-  async function handleSend() {
-    const trimmed = email.trim();
-    if (!trimmed) {
-      setError("נא להכניס כתובת אימייל.");
-      return;
-    }
-
-    setError("");
-    setLoading(true);
-    try {
-      const res = await fetch("/api/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: trimmed }),
-      });
-      if (!res.ok) throw new Error("server error");
-      setSentTo(trimmed);
-      setSent(true);
-    } catch {
-      setError("שגיאה בשליחה. נסי שוב.");
-    } finally {
-      setLoading(false);
-    }
-  }
+  const [state, formAction, isPending] = useActionState(resetPasswordAction, null);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -47,56 +19,59 @@ export default function ForgotPasswordPage() {
           <span className="text-3xl font-black tracking-tight">
             AP<span className="text-[#1CA9C9]">.</span>
           </span>
-          <p className="text-sm font-medium text-muted-foreground tracking-widest uppercase mt-1">Automations</p>
+          <p className="text-sm font-medium text-muted-foreground tracking-widest uppercase mt-1">
+            Automations
+          </p>
         </div>
 
         <Card className="border-border bg-card">
           <CardHeader className="pb-2 text-center">
             <h1 className="text-xl font-bold">
-              {sent ? "מייל נשלח!" : "איפוס סיסמה"}
+              {state && "success" in state ? "מייל נשלח!" : "איפוס סיסמה"}
             </h1>
           </CardHeader>
           <CardContent>
-            {sent ? (
+            {state && "success" in state ? (
               <div className="text-center py-4 space-y-4">
                 <div className="text-5xl">📧</div>
                 <p className="text-sm text-muted-foreground">
-                  שלחנו קישור לאיפוס סיסמה לכתובת <strong>{sentTo}</strong>.<br />
-                  בדקי את תיבת הדואר.
+                  שלחנו קישור לאיפוס סיסמה לכתובת{" "}
+                  <strong>{state.email}</strong>.<br />
+                  בדקי את תיבת הדואר (כולל ספאם).
                 </p>
-                <Link href="/login" className="block text-sm text-[#1CA9C9] hover:underline">
+                <Link
+                  href="/login"
+                  className="block text-sm text-[#1CA9C9] hover:underline"
+                >
                   חזרה לכניסה
                 </Link>
               </div>
             ) : (
-              <div className="space-y-4">
-                {error && (
+              <form action={formAction} className="space-y-4">
+                {state && "error" in state && (
                   <Alert variant="destructive">
-                    <AlertDescription>{error}</AlertDescription>
+                    <AlertDescription>{state.error}</AlertDescription>
                   </Alert>
                 )}
                 <div className="space-y-1.5">
                   <Label htmlFor="email">אימייל</Label>
                   <Input
                     id="email"
-                    type="text"
-                    inputMode="email"
+                    name="email"
+                    type="email"
                     dir="ltr"
                     placeholder="your@email.com"
                     autoComplete="email"
                     autoFocus
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    onKeyDown={(e) => e.key === "Enter" && handleSend()}
+                    required
                   />
                 </div>
                 <Button
-                  type="button"
-                  onClick={handleSend}
+                  type="submit"
                   className="w-full ap-gradient text-white font-semibold"
-                  disabled={loading}
+                  disabled={isPending}
                 >
-                  {loading ? "שולחת..." : "שלחי קישור לאיפוס"}
+                  {isPending ? "שולחת..." : "שלחי קישור לאיפוס"}
                 </Button>
                 <Link
                   href="/login"
@@ -104,7 +79,7 @@ export default function ForgotPasswordPage() {
                 >
                   חזרה לכניסה
                 </Link>
-              </div>
+              </form>
             )}
           </CardContent>
         </Card>
