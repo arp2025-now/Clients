@@ -1,17 +1,16 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import { getDownloadUrl, uploadClientDocument } from "@/app/(client)/documents/actions";
+import { Upload, FileText, Download, X } from "lucide-react";
 
 const TAGS_OPTIONS = ["חוזה", "מפרט", "חשבונית", "כללי"];
 
 const TAG_STYLES: Record<string, string> = {
-  "חוזה":    "bg-purple-500/15 text-purple-600 border-purple-500/20",
-  "מפרט":    "bg-blue-500/15 text-blue-600 border-blue-500/20",
-  "חשבונית": "bg-green-500/15 text-green-600 border-green-500/20",
-  "כללי":    "bg-gray-500/15 text-gray-500 border-gray-500/20",
+  "חוזה":    "bg-purple-100 text-purple-700 border-purple-200",
+  "מפרט":    "bg-blue-100 text-blue-700 border-blue-200",
+  "חשבונית": "bg-green-100 text-green-700 border-green-200",
+  "כללי":    "bg-gray-100 text-gray-600 border-gray-200",
 };
 
 function formatBytes(bytes: number) {
@@ -61,16 +60,13 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
     if (displayName) fd.append("displayName", displayName);
     if (note)        fd.append("note", note);
     if (selectedTags.length) fd.append("tags", selectedTags.join(","));
-
     const result = await uploadClientDocument(fd);
     setUploading(false);
     if (result.error) {
       setUploadError(result.error);
     } else {
       setShowForm(false);
-      setDisplayName("");
-      setNote("");
-      setSelectedTags([]);
+      setDisplayName(""); setNote(""); setSelectedTags([]);
     }
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -80,9 +76,7 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
     try {
       const url = await getDownloadUrl(storagePath);
       const a = document.createElement("a");
-      a.href = url;
-      a.download = filename;
-      a.click();
+      a.href = url; a.download = filename; a.click();
     } catch {
       alert("שגיאה בהורדת הקובץ");
     } finally {
@@ -90,58 +84,56 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
     }
   }
 
-  const allTags = Array.from(
-    new Set(files.flatMap((f) => f.tags ?? []))
-  );
-
-  const visibleFiles = filterTag
-    ? files.filter((f) => f.tags?.includes(filterTag))
-    : files;
+  const allTags = Array.from(new Set(files.flatMap((f) => f.tags ?? [])));
+  const visibleFiles = filterTag ? files.filter((f) => f.tags?.includes(filterTag)) : files;
 
   return (
     <div className="space-y-4">
-      {/* Upload area */}
-      <div className="space-y-3">
-        <div className="flex items-center gap-3">
-          <Button
-            variant="outline"
-            className="gap-2"
+
+      {/* Upload section */}
+      <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 flex items-center justify-between border-b border-gray-100">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-[#1CA9C9]" />
+            <h2 className="font-bold text-sm text-gray-800">העלאת מסמך</h2>
+          </div>
+          <button
             onClick={() => setShowForm((v) => !v)}
             disabled={uploading}
+            className="flex items-center gap-2 px-3 py-1.5 rounded-xl text-sm font-semibold transition-colors bg-[#1CA9C9] text-white hover:bg-[#1898B5]"
           >
-            {uploading ? "מעלה..." : showForm ? "ביטול" : "↑ העלאת קובץ"}
-          </Button>
-          {uploadError && (
-            <p className="text-xs text-destructive">{uploadError}</p>
-          )}
+            {showForm ? <><X className="w-3.5 h-3.5" /> ביטול</> : <><Upload className="w-3.5 h-3.5" /> העלאה</>}
+          </button>
         </div>
 
         {showForm && (
-          <div className="bg-card border border-[#1CA9C9]/30 rounded-xl p-4 space-y-3">
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">שם תצוגה (אופציונלי)</label>
-              <input
-                type="text"
-                value={displayName}
-                onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="למשל: חוזה עבודה סופי"
-                className="w-full bg-input border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#1CA9C9]/50"
-                dir="rtl"
-              />
+          <div className="p-5 space-y-4 bg-gray-50">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">שם תצוגה (אופציונלי)</label>
+                <input
+                  type="text"
+                  value={displayName}
+                  onChange={(e) => setDisplayName(e.target.value)}
+                  placeholder="למשל: חוזה עבודה סופי"
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#1CA9C9]/50 focus:ring-1 focus:ring-[#1CA9C9]/20"
+                  dir="rtl"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-gray-500 block mb-1">הערה (אופציונלי)</label>
+                <input
+                  type="text"
+                  value={note}
+                  onChange={(e) => setNote(e.target.value)}
+                  placeholder="הוסיפי הערה קצרה..."
+                  className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#1CA9C9]/50 focus:ring-1 focus:ring-[#1CA9C9]/20"
+                  dir="rtl"
+                />
+              </div>
             </div>
             <div>
-              <label className="text-xs text-muted-foreground block mb-1">הערה (אופציונלי)</label>
-              <input
-                type="text"
-                value={note}
-                onChange={(e) => setNote(e.target.value)}
-                placeholder="הוסיפי הערה קצרה לקובץ..."
-                className="w-full bg-input border border-border rounded-lg px-3 py-1.5 text-sm focus:outline-none focus:border-[#1CA9C9]/50"
-                dir="rtl"
-              />
-            </div>
-            <div>
-              <label className="text-xs text-muted-foreground block mb-1">תגיות</label>
+              <label className="text-xs font-medium text-gray-500 block mb-2">תגיות</label>
               <div className="flex flex-wrap gap-2">
                 {TAGS_OPTIONS.map((tag) => (
                   <button
@@ -150,8 +142,8 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
                     onClick={() => toggleTag(tag)}
                     className={`px-3 py-1 rounded-full border text-xs font-medium transition-all ${
                       selectedTags.includes(tag)
-                        ? "bg-[#1CA9C9]/20 border-[#1CA9C9] text-[#1CA9C9]"
-                        : "border-border text-muted-foreground hover:border-[#1CA9C9]/40"
+                        ? "bg-[#1CA9C9] border-[#1CA9C9] text-white"
+                        : "border-gray-200 text-gray-500 hover:border-[#1CA9C9]/40 bg-white"
                     }`}
                   >
                     {tag}
@@ -159,36 +151,27 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
                 ))}
               </div>
             </div>
-            <div>
-              <input
-                ref={inputRef}
-                type="file"
-                className="hidden"
-                onChange={handleUpload}
-                accept="*/*"
-              />
-              <Button
-                className="ap-gradient text-white w-full"
-                onClick={() => inputRef.current?.click()}
-                disabled={uploading}
-              >
-                {uploading ? "מעלה..." : "בחרי קובץ והעלי"}
-              </Button>
-            </div>
+            <input ref={inputRef} type="file" className="hidden" onChange={handleUpload} accept="*/*" />
+            <button
+              onClick={() => inputRef.current?.click()}
+              disabled={uploading}
+              className="w-full py-2.5 rounded-xl bg-[#1CA9C9] text-white text-sm font-semibold hover:bg-[#1898B5] transition-colors disabled:opacity-50"
+            >
+              {uploading ? "מעלה..." : "בחרי קובץ והעלי →"}
+            </button>
+            {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
           </div>
         )}
       </div>
 
-      {/* Tag filter chips */}
+      {/* Filter chips */}
       {allTags.length > 0 && (
         <div className="flex flex-wrap gap-2 items-center">
-          <span className="text-xs text-muted-foreground">סינון:</span>
+          <span className="text-xs text-gray-400 font-medium">סינון:</span>
           <button
             onClick={() => setFilterTag(null)}
-            className={`px-3 py-1 rounded-full border text-xs transition-all ${
-              filterTag === null
-                ? "bg-[#1CA9C9]/20 border-[#1CA9C9] text-[#1CA9C9]"
-                : "border-border text-muted-foreground hover:border-[#1CA9C9]/40"
+            className={`px-3 py-1 rounded-full border text-xs font-medium transition-all ${
+              filterTag === null ? "bg-[#1CA9C9] border-[#1CA9C9] text-white" : "border-gray-200 text-gray-500 bg-white hover:border-[#1CA9C9]/40"
             }`}
           >
             הכל
@@ -197,10 +180,8 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
             <button
               key={tag}
               onClick={() => setFilterTag(filterTag === tag ? null : tag)}
-              className={`px-3 py-1 rounded-full border text-xs transition-all ${
-                filterTag === tag
-                  ? "bg-[#1CA9C9]/20 border-[#1CA9C9] text-[#1CA9C9]"
-                  : "border-border text-muted-foreground hover:border-[#1CA9C9]/40"
+              className={`px-3 py-1 rounded-full border text-xs font-medium transition-all ${
+                filterTag === tag ? "bg-[#1CA9C9] border-[#1CA9C9] text-white" : "border-gray-200 text-gray-500 bg-white hover:border-[#1CA9C9]/40"
               }`}
             >
               {tag}
@@ -211,74 +192,56 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
 
       {/* Files list */}
       {visibleFiles.length === 0 ? (
-        <div className="bg-card border border-border rounded-xl p-10 text-center space-y-3">
-          <p className="text-3xl">📎</p>
-          <p className="font-semibold">
+        <div className="bg-white border border-gray-200 rounded-2xl p-10 text-center space-y-3 shadow-sm">
+          <div className="w-12 h-12 rounded-2xl bg-[#1CA9C9]/10 flex items-center justify-center mx-auto">
+            <FileText className="w-6 h-6 text-[#1CA9C9]" />
+          </div>
+          <p className="font-bold text-gray-800">
             {filterTag ? `אין קבצים עם תגית "${filterTag}"` : "אין מסמכים עדיין"}
           </p>
           {!filterTag && (
-            <p className="text-sm text-muted-foreground">
-              כאן יועלו חוזים, מסמכי אפיון וכל קובץ רלוונטי לפרויקט
-            </p>
+            <p className="text-sm text-gray-400">כאן יועלו חוזים, מסמכי אפיון וכל קובץ רלוונטי לפרויקט</p>
           )}
         </div>
       ) : (
-        <div className="space-y-3">
-          {visibleFiles.map((f) => (
-            <div
-              key={f.id}
-              className="bg-card border border-border rounded-xl px-4 py-3 flex items-start justify-between gap-3 hover:border-[#1CA9C9]/30 transition-colors"
-            >
-              <div className="flex items-start gap-3 min-w-0">
-                <span className="text-2xl flex-shrink-0 mt-0.5">📎</span>
-                <div className="min-w-0">
-                  <p className="text-sm font-medium truncate">
+        <div className="bg-white border border-gray-200 rounded-2xl shadow-sm overflow-hidden">
+          <div className="divide-y divide-gray-50">
+            {visibleFiles.map((f) => (
+              <div key={f.id} className="px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
+                <div className="w-9 h-9 rounded-xl bg-[#1CA9C9]/10 flex items-center justify-center flex-shrink-0">
+                  <FileText className="w-4 h-4 text-[#1CA9C9]" />
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-gray-800 truncate">
                     {f.display_name || f.filename}
                   </p>
-                  {f.display_name && (
-                    <p className="text-[10px] text-muted-foreground truncate">{f.filename}</p>
-                  )}
-                  <p className="text-[10px] text-muted-foreground">
-                    {formatBytes(f.size_bytes)}
-                    {f.size_bytes ? " · " : ""}
-                    {new Date(f.uploaded_at).toLocaleDateString("he-IL", {
-                      day: "numeric",
-                      month: "long",
-                      year: "numeric",
-                    })}
-                    {f.uploaded_by === "client" && " · הועלה על ידך"}
-                  </p>
+                  <div className="flex items-center gap-2 mt-0.5 flex-wrap">
+                    <span className="text-[11px] text-gray-400">
+                      {formatBytes(f.size_bytes)}
+                      {f.size_bytes ? " · " : ""}
+                      {new Date(f.uploaded_at).toLocaleDateString("he-IL", { day: "numeric", month: "short", year: "numeric" })}
+                    </span>
+                    {f.tags && f.tags.length > 0 && f.tags.map((tag) => (
+                      <span key={tag} className={`text-[10px] px-2 py-0.5 rounded-full border font-medium ${TAG_STYLES[tag] ?? "bg-gray-100 text-gray-600 border-gray-200"}`}>
+                        {tag}
+                      </span>
+                    ))}
+                  </div>
                   {f.note && (
-                    <p className="text-xs text-muted-foreground mt-1 bg-muted/40 rounded px-2 py-0.5 inline-block">
-                      {f.note}
-                    </p>
-                  )}
-                  {f.tags && f.tags.length > 0 && (
-                    <div className="flex flex-wrap gap-1 mt-1.5">
-                      {f.tags.map((tag) => (
-                        <span
-                          key={tag}
-                          className={`text-[10px] px-2 py-0.5 rounded-full border ${TAG_STYLES[tag] ?? "bg-gray-500/15 text-gray-500 border-gray-500/20"}`}
-                        >
-                          {tag}
-                        </span>
-                      ))}
-                    </div>
+                    <p className="text-[11px] text-gray-500 mt-1">{f.note}</p>
                   )}
                 </div>
-              </div>
-              <div className="flex items-center gap-2 flex-shrink-0 mt-0.5">
-                <Button
-                  size="sm"
-                  className="ap-gradient text-white text-xs h-7 px-3"
+                <button
                   onClick={() => handleDownload(f.id, f.storage_path, f.display_name || f.filename)}
                   disabled={downloadingId === f.id}
+                  className="flex items-center gap-1.5 px-3 py-1.5 rounded-xl border border-gray-200 text-xs font-semibold text-gray-600 hover:border-[#1CA9C9]/40 hover:text-[#1CA9C9] transition-colors disabled:opacity-40 flex-shrink-0"
                 >
-                  {downloadingId === f.id ? "מוריד..." : "הורד ↓"}
-                </Button>
+                  <Download className="w-3.5 h-3.5" />
+                  <span className="hidden sm:inline">{downloadingId === f.id ? "מוריד..." : "הורד"}</span>
+                </button>
               </div>
-            </div>
-          ))}
+            ))}
+          </div>
         </div>
       )}
     </div>

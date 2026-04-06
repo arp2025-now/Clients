@@ -3,7 +3,7 @@ import { TopBar } from "@/components/dashboard/TopBar";
 
 export default function ClientLayout({ children }: { children: React.ReactNode }) {
   return (
-    <div className="flex h-screen overflow-hidden bg-background">
+    <div className="flex h-screen overflow-hidden" style={{ background: "#f0f2f5" }}>
       <DashboardSidebar />
       <div className="flex flex-col flex-1 overflow-hidden">
         <TopBar />

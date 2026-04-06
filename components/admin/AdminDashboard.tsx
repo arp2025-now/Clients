@@ -4,34 +4,31 @@ import { useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { StatusBadge, PriorityBadge } from "@/components/dashboard/StatusBadge";
-import { Button } from "@/components/ui/button";
-import { Badge } from "@/components/ui/badge";
 import { updateTicketStatus } from "@/app/(admin)/admin/actions";
 import { AdminSearch } from "@/components/admin/AdminSearch";
 import { ExportButton } from "@/components/admin/ExportButton";
+import { Users, TicketCheck, Banknote, UserPlus, Send } from "lucide-react";
 
 const PAYMENT_BADGE: Record<string, { label: string; class: string }> = {
-  paid:    { label: "שולם",   class: "bg-green-500/15 text-green-400 border-green-500/20" },
-  pending: { label: "ממתין",  class: "bg-yellow-500/15 text-yellow-400 border-yellow-500/20" },
-  overdue: { label: "באיחור", class: "bg-red-500/15 text-red-400 border-red-500/20" },
+  paid:    { label: "שולם",   class: "bg-green-100 text-green-700 border-green-200" },
+  pending: { label: "ממתין",  class: "bg-yellow-100 text-yellow-700 border-yellow-200" },
+  overdue: { label: "באיחור", class: "bg-red-100 text-red-600 border-red-200" },
 };
 
-const CLIENT_STATUS_STYLES: Record<string, string> = {
-  onboarding: "border-r-[#1CA9C9]",
-  active:     "border-r-green-500",
-  paused:     "border-r-yellow-500",
-};
-
-const CLIENT_STATUS_LABELS: Record<string, string> = {
-  onboarding: "קליטה",
-  active:     "פעיל",
-  paused:     "מושהה",
+const CLIENT_STATUS_DOT: Record<string, string> = {
+  onboarding: "bg-[#1CA9C9]",
+  active:     "bg-green-400",
+  paused:     "bg-yellow-400",
 };
 
 const CLIENT_STATUS_BADGE: Record<string, string> = {
-  onboarding: "bg-[rgba(28,169,201,0.15)] text-[#1CA9C9] border-[#1CA9C9]/30",
-  active:     "bg-green-500/15 text-green-400 border-green-500/20",
-  paused:     "bg-yellow-500/15 text-yellow-400 border-yellow-500/20",
+  onboarding: "bg-[#1CA9C9]/10 text-[#1CA9C9] border-[#1CA9C9]/30",
+  active:     "bg-green-100 text-green-700 border-green-200",
+  paused:     "bg-yellow-100 text-yellow-700 border-yellow-200",
+};
+
+const CLIENT_STATUS_LABELS: Record<string, string> = {
+  onboarding: "קליטה", active: "פעיל", paused: "מושהה",
 };
 
 function timeAgo(iso: string) {
@@ -44,11 +41,14 @@ function timeAgo(iso: string) {
   return `לפני ${Math.floor(hours / 24)} ימים`;
 }
 
-const ACTION_LABELS: Record<string, string> = {
-  created: "נוצר", updated: "עודכן", status_changed: "שינוי סטטוס", commented: "תגובה", uploaded: "קובץ הועלה",
+const ENTITY_ICONS: Record<string, string> = {
+  ticket: "🎫", project: "📁", payment: "💳", file: "📎", comment: "💬",
 };
 const ENTITY_LABELS: Record<string, string> = {
   ticket: "טיקט", project: "פרויקט", payment: "תשלום", file: "קובץ", comment: "הערה",
+};
+const ACTION_LABELS: Record<string, string> = {
+  created: "נוצר", updated: "עודכן", status_changed: "שינוי סטטוס", commented: "תגובה", uploaded: "קובץ הועלה",
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -83,195 +83,184 @@ export function AdminDashboard({ clients, openTickets, totalRevenue = 0, recentA
   }
 
   const activeCount = clients.filter((c) => c.status === "active").length;
-  const totalOpenTickets = openTickets.length;
 
   return (
-    <div className="p-4 sm:p-6 space-y-6 sm:space-y-8 max-w-5xl">
-      {/* Header */}
-      <div className="flex items-start justify-between gap-6">
+    <div className="p-4 sm:p-6 space-y-5 max-w-6xl">
+
+      {/* Top bar */}
+      <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-black ap-gradient-text">AP Automations</h1>
-          <p className="text-sm text-muted-foreground mt-0.5">לוח בקרה פנימי</p>
-          <div className="mt-3">
-            <AdminSearch />
-          </div>
+          <h1 className="text-xl font-black text-gray-900">לוח בקרה</h1>
+          <p className="text-xs text-gray-400 mt-0.5">AP Automations — ניהול פנימי</p>
         </div>
-        {/* Invite form — card style */}
-        <div className="bg-card border border-border rounded-xl p-4 space-y-3 w-72 flex-shrink-0">
-          <p className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">הזמנת לקוח חדש</p>
-          <form onSubmit={handleInvite} className="flex gap-2">
-            <input
-              type="email"
-              value={inviteEmail}
-              onChange={(e) => setInviteEmail(e.target.value)}
-              placeholder="אימייל"
-              dir="ltr"
-              className="bg-input border border-border rounded-lg px-3 py-2 text-sm flex-1 outline-none focus:border-[#1CA9C9] transition-colors"
-              required
-            />
-            <Button type="submit" className="ap-gradient text-white text-sm px-4" disabled={inviteLoading}>
-              {inviteLoading ? "..." : "שלח"}
-            </Button>
-          </form>
-          {inviteMsg && (
-            <p className={`text-xs ${inviteMsg.startsWith("✓") ? "text-green-400" : "text-red-400"}`}>
-              {inviteMsg}
-            </p>
+        <AdminSearch />
+      </div>
+
+      {/* Stats */}
+      <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        {[
+          { label: "סה״כ לקוחות",   value: clients.length,    color: "text-gray-800",    icon: Users,       accent: "#6366f1" },
+          { label: "לקוחות פעילים", value: activeCount,        color: "text-[#1CA9C9]",  icon: Users,       accent: "#1CA9C9" },
+          { label: "טיקטים פתוחים", value: openTickets.length, color: openTickets.length > 0 ? "text-orange-500" : "text-green-600", icon: TicketCheck, accent: openTickets.length > 0 ? "#f97316" : "#22c55e" },
+          { label: "הכנסה (שולם)",  value: `₪${totalRevenue.toLocaleString("he-IL")}`, color: "text-green-600", icon: Banknote, accent: "#22c55e" },
+        ].map(({ label, value, color, icon: Icon, accent }) => (
+          <div key={label} className="bg-white rounded-2xl border border-gray-200 shadow-sm p-4">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${accent}18` }}>
+                <Icon className="w-3.5 h-3.5" style={{ color: accent }} />
+              </div>
+            </div>
+            <p className={`text-2xl font-black tabular-nums ${color}`}>{value}</p>
+          </div>
+        ))}
+      </div>
+
+      {/* Clients + Invite */}
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+        {/* Clients list */}
+        <div className="lg:col-span-2 bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-4 rounded-full bg-[#1CA9C9]" />
+              <h2 className="font-bold text-sm text-gray-800">לקוחות ({clients.length})</h2>
+            </div>
+            <ExportButton type="clients" label="ייצא" />
+          </div>
+          {clients.length === 0 ? (
+            <div className="p-8 text-center text-sm text-gray-400">אין לקוחות עדיין</div>
+          ) : (
+            <div className="divide-y divide-gray-50">
+              {clients.map((client) => {
+                const lastPayment = client.payments?.[client.payments.length - 1];
+                const payBadge = PAYMENT_BADGE[lastPayment?.status ?? "pending"];
+                const openCount = client.tickets?.filter((t: { status: string }) => ["open", "in_progress"].includes(t.status)).length ?? 0;
+                const clientStatus = client.status ?? "onboarding";
+
+                return (
+                  <Link
+                    key={client.id}
+                    href={`/admin/clients/${client.id}`}
+                    className="px-5 py-3.5 flex items-center gap-3 hover:bg-gray-50 transition-colors block"
+                  >
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${CLIENT_STATUS_DOT[clientStatus] ?? "bg-gray-300"}`} />
+                    <div className="flex-1 min-w-0">
+                      <p className="font-semibold text-sm text-gray-800 truncate">{client.business_name}</p>
+                      <p className="text-[11px] text-gray-400">
+                        {client.projects?.length ?? 0} פרויקטים
+                        {openCount > 0 && <span className="text-orange-500 font-medium"> · {openCount} טיקטים פתוחים</span>}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-2 flex-shrink-0">
+                      <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${CLIENT_STATUS_BADGE[clientStatus]}`}>
+                        {CLIENT_STATUS_LABELS[clientStatus]}
+                      </span>
+                      {lastPayment && (
+                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-full border ${payBadge.class}`}>
+                          {payBadge.label}
+                        </span>
+                      )}
+                    </div>
+                  </Link>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        {/* Invite + Activity */}
+        <div className="space-y-4">
+          {/* Invite form */}
+          <div className="bg-white rounded-2xl border border-gray-200 shadow-sm p-5">
+            <div className="flex items-center gap-2 mb-4">
+              <div className="w-8 h-8 rounded-xl bg-[#1CA9C9]/10 flex items-center justify-center">
+                <UserPlus className="w-4 h-4 text-[#1CA9C9]" />
+              </div>
+              <h2 className="font-bold text-sm text-gray-800">הזמנת לקוח</h2>
+            </div>
+            <form onSubmit={handleInvite} className="space-y-2">
+              <input
+                type="email"
+                value={inviteEmail}
+                onChange={(e) => setInviteEmail(e.target.value)}
+                placeholder="כתובת מייל"
+                dir="ltr"
+                className="w-full border border-gray-200 rounded-xl px-3 py-2.5 text-sm focus:outline-none focus:border-[#1CA9C9]/50 focus:ring-1 focus:ring-[#1CA9C9]/20"
+                required
+              />
+              <button
+                type="submit"
+                disabled={inviteLoading}
+                className="w-full flex items-center justify-center gap-2 py-2.5 rounded-xl bg-[#1CA9C9] text-white text-sm font-semibold hover:bg-[#1898B5] transition-colors disabled:opacity-50"
+              >
+                <Send className="w-3.5 h-3.5" />
+                {inviteLoading ? "שולח..." : "שליחת הזמנה"}
+              </button>
+            </form>
+            {inviteMsg && (
+              <p className={`text-xs mt-2 ${inviteMsg.startsWith("✓") ? "text-green-600" : "text-red-500"}`}>
+                {inviteMsg}
+              </p>
+            )}
+          </div>
+
+          {/* Recent activity */}
+          {recentActivity.length > 0 && (
+            <div className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+              <div className="px-4 py-3 border-b border-gray-100 flex items-center gap-2">
+                <div className="w-1 h-4 rounded-full bg-indigo-400" />
+                <h2 className="font-bold text-sm text-gray-800">פעילות אחרונה</h2>
+              </div>
+              <div className="divide-y divide-gray-50">
+                {recentActivity.slice(0, 5).map((entry) => (
+                  <div key={entry.id} className="px-4 py-3 flex items-start gap-2.5">
+                    <span className="text-sm flex-shrink-0">{ENTITY_ICONS[entry.entity_type] ?? "·"}</span>
+                    <div className="min-w-0">
+                      <p className="text-xs font-medium text-gray-700">
+                        {entry.clients?.business_name && <span className="text-[#1CA9C9]">{entry.clients.business_name} · </span>}
+                        {ENTITY_LABELS[entry.entity_type]} {ACTION_LABELS[entry.action]}
+                      </p>
+                      <p className="text-[10px] text-gray-400 mt-0.5">{timeAgo(entry.created_at)}</p>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
           )}
         </div>
       </div>
 
-      {/* Stats bar */}
-      <div className="grid grid-cols-4 gap-4">
-        <div className="bg-card border border-border rounded-xl p-4 space-y-1">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">סה״כ לקוחות</p>
-          <p className="text-3xl font-black text-foreground">{clients.length}</p>
-        </div>
-        <div className="bg-card border border-[#1CA9C9]/20 rounded-xl p-4 space-y-1">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">לקוחות פעילים</p>
-          <p className="text-3xl font-black text-[#1CA9C9]">{activeCount}</p>
-        </div>
-        <div className={`bg-card border rounded-xl p-4 space-y-1 ${totalOpenTickets > 0 ? "border-yellow-500/20" : "border-green-500/20"}`}>
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">טיקטים פתוחים</p>
-          <p className={`text-3xl font-black ${totalOpenTickets > 0 ? "text-yellow-400" : "text-green-400"}`}>{totalOpenTickets}</p>
-        </div>
-        <div className="bg-card border border-green-500/20 rounded-xl p-4 space-y-1">
-          <p className="text-[10px] uppercase tracking-wider text-muted-foreground">הכנסה (שולם)</p>
-          <p className="text-2xl font-black text-green-400 tabular-nums">
-            ₪{totalRevenue.toLocaleString("he-IL")}
-          </p>
-        </div>
-      </div>
-
-      {/* Clients grid */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full ap-gradient inline-block" />
-            לקוחות ({clients.length})
-          </h2>
-          <ExportButton type="clients" label="↓ ייצא לקוחות" />
-        </div>
-        {clients.length === 0 ? (
-          <p className="text-muted-foreground text-sm">אין לקוחות עדיין</p>
-        ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {clients.map((client) => {
-              const lastPayment = client.payments?.[client.payments.length - 1];
-              const paymentStatus = lastPayment?.status ?? "pending";
-              const payBadge = PAYMENT_BADGE[paymentStatus];
-              const openCount = client.tickets?.filter(
-                (t: { status: string }) => ["open", "in_progress"].includes(t.status)
-              ).length ?? 0;
-
-              const clientStatus = client.status ?? "onboarding";
-
-              return (
-                <Link
-                  key={client.id}
-                  href={`/admin/clients/${client.id}`}
-                  className={`bg-card border border-border border-r-2 rounded-xl p-4 space-y-3 hover:border-[#1CA9C9]/40 transition-colors block ${CLIENT_STATUS_STYLES[clientStatus]}`}
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <span className="font-bold text-sm leading-tight">{client.business_name}</span>
-                    <div className="flex gap-1.5 flex-shrink-0">
-                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${CLIENT_STATUS_BADGE[clientStatus]}`}>
-                        {CLIENT_STATUS_LABELS[clientStatus]}
-                      </Badge>
-                      <Badge variant="outline" className={`text-[10px] px-2 py-0.5 ${payBadge.class}`}>
-                        {payBadge.label}
-                      </Badge>
-                    </div>
-                  </div>
-                  <div className="flex gap-4 text-xs text-muted-foreground">
-                    <span>{client.projects?.length ?? 0} פרויקטים</span>
-                    {openCount > 0 && (
-                      <span className="text-yellow-400 font-semibold">{openCount} טיקטים פתוחים</span>
-                    )}
-                  </div>
-                  {lastPayment && (
-                    <p className="text-[10px] text-muted-foreground">
-                      תשלום אחרון: ₪{lastPayment.amount}
-                    </p>
-                  )}
-                </Link>
-              );
-            })}
-          </div>
-        )}
-      </section>
-
-      {/* Recent activity */}
-      {recentActivity.length > 0 && (
-        <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-purple-500 inline-block" />
-            פעילות אחרונה
-          </h2>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-            {recentActivity.map((entry) => (
-              <div key={entry.id} className="bg-card border border-border rounded-xl px-4 py-3 flex items-start gap-3">
-                <span className="text-base mt-0.5 flex-shrink-0">
-                  {entry.entity_type === "ticket" ? "◎" : entry.entity_type === "file" ? "📎" : entry.entity_type === "comment" ? "💬" : "◉"}
-                </span>
-                <div className="min-w-0">
-                  <p className="text-xs font-medium">
-                    {entry.clients?.business_name && <span className="text-[#1CA9C9]">{entry.clients.business_name} · </span>}
-                    {ENTITY_LABELS[entry.entity_type] ?? entry.entity_type} {ACTION_LABELS[entry.action] ?? entry.action}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">{timeAgo(entry.created_at)}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </section>
-      )}
-
       {/* Open tickets */}
-      <section>
-        <div className="flex items-center justify-between mb-4">
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-2">
-            <span className="w-1 h-4 rounded-full bg-yellow-500 inline-block" />
-            טיקטים פתוחים ({openTickets.length})
-          </h2>
-          <ExportButton type="tickets" label="↓ ייצא טיקטים" />
+      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-orange-400" />
+            <h2 className="font-bold text-sm text-gray-800">טיקטים פתוחים ({openTickets.length})</h2>
+          </div>
+          <ExportButton type="tickets" label="ייצא" />
         </div>
         {openTickets.length === 0 ? (
-          <p className="text-muted-foreground text-sm">אין טיקטים פתוחים ✓</p>
+          <div className="p-6 text-center text-sm text-gray-400">אין טיקטים פתוחים ✓</div>
         ) : (
-          <div className="space-y-3">
+          <div className="divide-y divide-gray-50">
             {openTickets.map((ticket) => (
-              <div
-                key={ticket.id}
-                className="bg-card border border-border rounded-xl p-4 flex items-start gap-4"
-              >
-                <div className="flex-1 space-y-1 min-w-0">
+              <div key={ticket.id} className="px-5 py-3.5 flex items-center gap-4">
+                <div className="flex-1 min-w-0">
                   <div className="flex items-center gap-2 flex-wrap">
-                    <span className="font-semibold text-sm">{ticket.subject}</span>
+                    <span className="font-semibold text-sm text-gray-800 truncate">{ticket.subject}</span>
                     <PriorityBadge priority={ticket.priority} />
                     <StatusBadge status={ticket.status} />
                   </div>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-gray-400 mt-0.5">
                     {ticket.clients?.business_name}
                     {ticket.clients?.phone && ` · ${ticket.clients.phone}`}
                   </p>
-                  {ticket.description && (
-                    <p className="text-xs text-muted-foreground line-clamp-1">{ticket.description}</p>
-                  )}
                 </div>
-                {/* Status changer */}
                 <select
                   defaultValue={ticket.status}
-                  onChange={(e) =>
-                    handleStatusChange(
-                      ticket.id,
-                      e.target.value,
-                      ticket.clients?.phone,
-                      ticket.clients?.business_name,
-                      ticket.subject
-                    )
-                  }
-                  className="bg-secondary border border-border rounded-lg px-2 py-1.5 text-xs outline-none focus:border-[#1CA9C9] flex-shrink-0"
+                  onChange={(e) => handleStatusChange(ticket.id, e.target.value, ticket.clients?.phone, ticket.clients?.business_name, ticket.subject)}
+                  className="border border-gray-200 rounded-xl px-2.5 py-1.5 text-xs outline-none focus:border-[#1CA9C9] bg-white text-gray-700 flex-shrink-0"
                 >
                   <option value="open">פתוח</option>
                   <option value="in_progress">בטיפול</option>

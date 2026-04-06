@@ -46,7 +46,7 @@
 
 /* AP Automations — Light theme */
 :root {
-  --background: oklch(0.975 0.003 262);
+  --background: oklch(0.965 0.005 262);
   --foreground: oklch(0.15 0.02 262);
   --card: oklch(1 0 0);
   --card-foreground: oklch(0.15 0.02 262);

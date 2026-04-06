@@ -3,6 +3,7 @@ import { redirect } from "next/navigation";
 import { StatusBadge, PriorityBadge } from "@/components/dashboard/StatusBadge";
 import { Progress } from "@/components/ui/progress";
 import Link from "next/link";
+import { Folders, TicketCheck, FileStack, Clock, ArrowLeft } from "lucide-react";
 
 function timeAgo(iso: string) {
   const diff = Date.now() - new Date(iso).getTime();
@@ -17,9 +18,9 @@ function timeAgo(iso: string) {
 const ACTION_LABELS: Record<string, string> = {
   created: "נוצר",
   updated: "עודכן",
-  status_changed: "שונה סטטוס",
-  commented: "הוסף תגובה",
-  uploaded: "הועלה קובץ",
+  status_changed: "שינוי סטטוס",
+  commented: "תגובה חדשה",
+  uploaded: "קובץ הועלה",
 };
 
 const ENTITY_LABELS: Record<string, string> = {
@@ -28,6 +29,14 @@ const ENTITY_LABELS: Record<string, string> = {
   payment: "תשלום",
   file: "קובץ",
   comment: "הערה",
+};
+
+const ENTITY_ICONS: Record<string, string> = {
+  ticket: "🎫",
+  project: "📁",
+  payment: "💳",
+  file: "📎",
+  comment: "💬",
 };
 
 export default async function DashboardPage() {
@@ -46,7 +55,7 @@ export default async function DashboardPage() {
     supabase.from("projects").select("*").order("created_at", { ascending: false }),
     supabase.from("tickets").select("*").in("status", ["open", "in_progress"]).order("created_at", { ascending: false }),
     supabase.from("client_files").select("id").limit(100),
-    supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(8),
+    supabase.from("audit_log").select("*").order("created_at", { ascending: false }).limit(6),
   ]);
 
   const avgProgress =
@@ -57,194 +66,160 @@ export default async function DashboardPage() {
   const liveCount = projects?.filter((p) => p.status === "live").length ?? 0;
 
   return (
-    <div className="p-4 sm:p-6 space-y-4 sm:space-y-6 max-w-5xl mx-auto w-full">
+    <div className="p-4 sm:p-6 space-y-5 max-w-5xl mx-auto w-full">
+
       {/* Welcome banner */}
-      <div
-        className="relative overflow-hidden rounded-2xl p-6"
-        style={{
-          background: "linear-gradient(135deg, rgba(28,169,201,0.15) 0%, rgba(66,152,166,0.08) 100%)",
-          border: "1px solid rgba(28,169,201,0.25)",
-        }}
-      >
-        <div className="flex items-center justify-between gap-4">
-          <div>
-            <h2 className="text-2xl font-black">שלום, {client?.business_name ?? "לקוח"} 👋</h2>
-            <p className="text-sm text-muted-foreground mt-1">
-              ברוכים הבאים לפורטל AP Automations
-            </p>
-          </div>
-          <div className="text-3xl sm:text-5xl font-black ap-gradient-text leading-none flex-shrink-0">
-            {avgProgress}%
-          </div>
+      <div className="bg-white rounded-2xl p-5 border border-gray-200 shadow-sm flex items-center justify-between gap-4">
+        <div>
+          <p className="text-xs font-medium text-gray-400 mb-0.5">ברוכים הבאים</p>
+          <h1 className="text-xl font-black text-gray-900">{client?.business_name ?? "לקוח"}</h1>
+          <p className="text-sm text-gray-500 mt-0.5">פורטל AP Automations</p>
         </div>
-        <Progress value={avgProgress} className="mt-4 h-1.5" />
-        <p className="text-xs text-muted-foreground mt-2">
-          {liveCount} מתוך {projects?.length ?? 0} פרויקטים Live
-        </p>
+        <div className="text-left flex-shrink-0">
+          <p className="text-[11px] text-gray-400 mb-1 text-center">התקדמות כוללת</p>
+          <p className="text-4xl font-black text-[#1CA9C9] leading-none text-center">{avgProgress}%</p>
+          <p className="text-[10px] text-gray-400 mt-1 text-center">{liveCount}/{projects?.length ?? 0} Live</p>
+        </div>
       </div>
 
       {/* Stats row */}
-      <div className="grid grid-cols-3 gap-2 sm:gap-4">
-        <div className="bg-card border border-border rounded-2xl p-4 space-y-1">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">פרויקטים</p>
-          <p className="text-3xl font-black text-[#1CA9C9]">{projects?.length ?? 0}</p>
-          <p className="text-xs text-muted-foreground">{liveCount} Live</p>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 space-y-1">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">טיקטים פתוחים</p>
-          <p className="text-3xl font-black" style={{ color: (tickets?.length ?? 0) > 0 ? "#eab308" : "#22c55e" }}>
-            {tickets?.length ?? 0}
-          </p>
-          <p className="text-xs text-muted-foreground">דורשים מענה</p>
-        </div>
-        <div className="bg-card border border-border rounded-2xl p-4 space-y-1">
-          <p className="text-[11px] uppercase tracking-wider text-muted-foreground">קבצים</p>
-          <p className="text-3xl font-black text-foreground">{files?.length ?? 0}</p>
-          <p className="text-xs text-muted-foreground">מסמכים ונכסים</p>
-        </div>
+      <div className="grid grid-cols-3 gap-3">
+        {[
+          { label: "פרויקטים", value: projects?.length ?? 0, sub: `${liveCount} פעילים`, icon: Folders, color: "#1CA9C9" },
+          { label: "טיקטים פתוחים", value: tickets?.length ?? 0, sub: "דורשים מענה", icon: TicketCheck, color: (tickets?.length ?? 0) > 0 ? "#f97316" : "#22c55e" },
+          { label: "מסמכים", value: files?.length ?? 0, sub: "קבצים ונכסים", icon: FileStack, color: "#6366f1" },
+        ].map(({ label, value, sub, icon: Icon, color }) => (
+          <div key={label} className="bg-white rounded-2xl p-4 border border-gray-200 shadow-sm">
+            <div className="flex items-center justify-between mb-2">
+              <p className="text-[11px] font-semibold text-gray-400 uppercase tracking-wide">{label}</p>
+              <div className="w-7 h-7 rounded-lg flex items-center justify-center" style={{ background: `${color}18` }}>
+                <Icon className="w-3.5 h-3.5" style={{ color }} />
+              </div>
+            </div>
+            <p className="text-3xl font-black" style={{ color }}>{value}</p>
+            <p className="text-[11px] text-gray-400 mt-0.5">{sub}</p>
+          </div>
+        ))}
       </div>
 
-      {/* Projects grid */}
-      <section>
-        <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-4 flex items-center gap-2">
-          <span className="w-1 h-4 rounded-full ap-gradient inline-block" />
-          פרויקטים פעילים
-        </h2>
+      {/* Projects */}
+      <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+          <div className="flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-[#1CA9C9]" />
+            <h2 className="font-bold text-sm text-gray-800">פרויקטים פעילים</h2>
+          </div>
+          <span className="text-xs text-gray-400 font-medium">{projects?.length ?? 0} סה"כ</span>
+        </div>
+
         {projects && projects.length > 0 ? (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            {projects.map((project) => {
-              const borderColor =
-                project.status === "live"
-                  ? "border-t-green-500"
-                  : project.status === "testing"
-                  ? "border-t-orange-400"
-                  : "border-t-[#1CA9C9]";
-              return (
-                <div
-                  key={project.id}
-                  className={`bg-card border border-border border-t-2 ${borderColor} rounded-2xl overflow-hidden hover:shadow-md transition-shadow`}
-                >
-                  {/* Cover image */}
-                  {project.image_url ? (
-                    <img
-                      src={project.image_url}
-                      alt={project.name}
-                      className="w-full h-36 object-cover"
-                    />
-                  ) : (
-                    <div
-                      className="w-full h-36 flex items-center justify-center text-4xl"
-                      style={{
-                        background:
-                          "linear-gradient(135deg, rgba(28,169,201,0.12) 0%, rgba(66,152,166,0.06) 100%)",
-                      }}
-                    >
-                      ◎
-                    </div>
+          <div className="divide-y divide-gray-50">
+            {projects.map((project) => (
+              <div key={project.id} className="px-5 py-4 flex items-center gap-4 hover:bg-gray-50 transition-colors">
+                {/* Color dot */}
+                <div className={`w-2 h-2 rounded-full flex-shrink-0 ${
+                  project.status === "live" ? "bg-green-400" :
+                  project.status === "testing" ? "bg-orange-400" : "bg-[#1CA9C9]"
+                }`} />
+
+                {/* Name + description */}
+                <div className="flex-1 min-w-0">
+                  <p className="font-semibold text-sm text-gray-800 truncate">{project.name}</p>
+                  {project.description && (
+                    <p className="text-xs text-gray-400 truncate mt-0.5">{project.description}</p>
                   )}
-                  <div className="p-4 space-y-3">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="font-semibold text-sm leading-tight">{project.name}</span>
-                      <StatusBadge status={project.status} />
-                    </div>
-                    {project.description && (
-                      <p className="text-xs text-muted-foreground line-clamp-2">{project.description}</p>
-                    )}
-                    <div className="flex items-center gap-3">
-                      <Progress value={project.progress_pct} className="flex-1 h-1.5" />
-                      <span className="text-xs font-bold text-[#1CA9C9] tabular-nums w-8 text-left">
-                        {project.progress_pct}%
-                      </span>
-                    </div>
-                  </div>
                 </div>
-              );
-            })}
+
+                {/* Progress */}
+                <div className="hidden sm:flex items-center gap-2 w-28">
+                  <Progress value={project.progress_pct} className="h-1.5 flex-1" />
+                  <span className="text-xs font-bold text-[#1CA9C9] w-8 text-left tabular-nums">
+                    {project.progress_pct}%
+                  </span>
+                </div>
+
+                {/* Status badge */}
+                <StatusBadge status={project.status} />
+              </div>
+            ))}
           </div>
         ) : (
-          <div className="bg-card border border-border rounded-2xl p-8 text-center text-muted-foreground text-sm">
+          <div className="p-8 text-center text-sm text-gray-400">
             הפרויקטים יופיעו כאן לאחר שיפתחו עבורך
           </div>
         )}
       </section>
 
-      {/* Open tickets + recent activity */}
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      {/* Tickets + Activity */}
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
+
         {/* Open tickets */}
-        <section>
-          <div className="flex items-center justify-between mb-3">
-            <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-              טיקטים פתוחים
-            </h2>
-            <Link href="/tickets" className="text-xs text-[#1CA9C9] hover:underline">
-              כל הטיקטים ←
+        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <div className="w-1 h-4 rounded-full bg-orange-400" />
+              <h2 className="font-bold text-sm text-gray-800">טיקטים פתוחים</h2>
+            </div>
+            <Link href="/tickets" className="text-xs text-[#1CA9C9] hover:underline flex items-center gap-0.5">
+              הכל <ArrowLeft className="w-3 h-3" />
             </Link>
           </div>
+
           {tickets && tickets.length > 0 ? (
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-50">
               {tickets.slice(0, 4).map((t) => (
-                <div
-                  key={t.id}
-                  className="bg-card border border-border rounded-xl px-4 py-3 flex items-center justify-between gap-3"
-                >
-                  <span className="text-sm truncate">{t.subject}</span>
+                <div key={t.id} className="px-5 py-3 flex items-center justify-between gap-3 hover:bg-gray-50 transition-colors">
+                  <span className="text-sm text-gray-700 truncate">{t.subject}</span>
                   <PriorityBadge priority={t.priority} />
                 </div>
               ))}
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-xl p-5 text-center text-muted-foreground text-sm">
-              אין טיקטים פתוחים ✓
-            </div>
+            <div className="p-6 text-center text-sm text-gray-400">אין טיקטים פתוחים ✓</div>
           )}
-          <Link
-            href="/tickets"
-            className="mt-3 block w-full text-center py-2.5 rounded-xl border border-[#1CA9C9]/30 text-[#1CA9C9] text-sm font-semibold hover:bg-[rgba(28,169,201,0.08)] transition-colors"
-          >
-            פתיחת טיקט חדש +
-          </Link>
+
+          <div className="px-5 py-3 border-t border-gray-100">
+            <Link
+              href="/tickets"
+              className="block w-full text-center py-2 rounded-xl border border-[#1CA9C9]/30 text-[#1CA9C9] text-sm font-semibold hover:bg-[#1CA9C9]/5 transition-colors"
+            >
+              + פתיחת טיקט חדש
+            </Link>
+          </div>
         </section>
 
         {/* Recent activity */}
-        <section>
-          <h2 className="text-xs font-semibold uppercase tracking-wider text-muted-foreground mb-3">
-            פעילות אחרונה
-          </h2>
+        <section className="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+          <div className="px-5 py-4 border-b border-gray-100 flex items-center gap-2">
+            <div className="w-1 h-4 rounded-full bg-indigo-400" />
+            <h2 className="font-bold text-sm text-gray-800">פעילות אחרונה</h2>
+          </div>
+
           {activity && activity.length > 0 ? (
-            <div className="space-y-2">
+            <div className="divide-y divide-gray-50">
               {activity.map((entry) => (
-                <div
-                  key={entry.id}
-                  className="bg-card border border-border rounded-xl px-4 py-3 flex items-start gap-3"
-                >
-                  <span className="text-base mt-0.5 flex-shrink-0">
-                    {entry.entity_type === "ticket" ? "◎" :
-                     entry.entity_type === "file" ? "📎" :
-                     entry.entity_type === "comment" ? "💬" :
-                     entry.entity_type === "project" ? "◉" : "·"}
+                <div key={entry.id} className="px-5 py-3 flex items-start gap-3 hover:bg-gray-50 transition-colors">
+                  <span className="text-base flex-shrink-0 mt-0.5">
+                    {ENTITY_ICONS[entry.entity_type] ?? "·"}
                   </span>
-                  <div className="min-w-0">
-                    <p className="text-xs font-medium">
+                  <div className="min-w-0 flex-1">
+                    <p className="text-xs font-medium text-gray-700">
                       {ENTITY_LABELS[entry.entity_type] ?? entry.entity_type}{" "}
                       {ACTION_LABELS[entry.action] ?? entry.action}
                       {entry.details?.subject ? `: ${entry.details.subject}` : ""}
                     </p>
-                    {entry.details?.from && entry.details?.to && (
-                      <p className="text-[10px] text-muted-foreground">
-                        {entry.details.from} ← {entry.details.to}
+                    <div className="flex items-center gap-1 mt-0.5">
+                      <Clock className="w-2.5 h-2.5 text-gray-300" />
+                      <p className="text-[10px] text-gray-400">
+                        {entry.actor === "admin" ? "הצוות" : "את"} · {timeAgo(entry.created_at)}
                       </p>
-                    )}
-                    <p className="text-[10px] text-muted-foreground mt-0.5">
-                      {entry.actor === "admin" ? "הצוות" : "את"} · {timeAgo(entry.created_at)}
-                    </p>
+                    </div>
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="bg-card border border-border rounded-xl p-5 text-center text-muted-foreground text-sm">
-              אין פעילות עדיין
-            </div>
+            <div className="p-6 text-center text-sm text-gray-400">אין פעילות עדיין</div>
           )}
         </section>
       </div>
