@@ -1,6 +1,6 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { redirect } from "next/navigation";
 
 export type ResetState = { error: string } | { success: true } | null;
@@ -29,11 +29,31 @@ export async function updatePasswordAction(
     return { error: "קישור האיפוס פג תוקף. בקשי קישור חדש." };
   }
 
-  const { error } = await supabase.auth.updateUser({ password });
-  console.log("[reset-password] updateUser error:", error?.message ?? "none");
+  // Use admin client to bypass Supabase "Secure password change" flow.
+  // supabase.auth.updateUser() via recovery session can mark the change as
+  // PENDING until the user clicks a confirmation email, causing signInWithPassword
+  // to fail after logout. Admin updateUserById sets the password immediately.
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(user.id, {
+    password,
+    email_confirm: true,
+  });
+  console.log("[reset-password] updateUserById error:", error?.message ?? "none");
 
   if (error) {
     return { error: error.message };
+  }
+
+  // Sign in immediately with the new password to swap the recovery session for a
+  // regular password-based session. Without this the browser holds a recovery
+  // token; after sign-out Supabase rejects the next signInWithPassword.
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email!,
+    password,
+  });
+  if (signInError) {
+    console.error("[reset-password] signInWithPassword error:", signInError.message);
+    return { error: signInError.message };
   }
 
   redirect("/dashboard");

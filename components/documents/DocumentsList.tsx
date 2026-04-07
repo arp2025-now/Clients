@@ -1,7 +1,9 @@
 "use client";
 
 import { useState, useRef } from "react";
-import { getDownloadUrl, uploadClientDocument } from "@/app/(client)/documents/actions";
+import { useRouter } from "next/navigation";
+import { createClient } from "@/lib/supabase/client";
+import { getDownloadUrl, getUploadUrl, recordUploadedFile } from "@/app/(client)/documents/actions";
 import { Upload, FileText, Download, X } from "lucide-react";
 
 const TAGS_OPTIONS = ["חוזה", "מפרט", "חשבונית", "כללי"];
@@ -34,6 +36,7 @@ interface FileRow {
 }
 
 export function DocumentsList({ files }: { files: FileRow[] }) {
+  const router = useRouter();
   const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [uploading, setUploading]         = useState(false);
   const [uploadError, setUploadError]     = useState("");
@@ -55,18 +58,46 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
     if (!file) return;
     setUploading(true);
     setUploadError("");
-    const fd = new FormData();
-    fd.append("file", file);
-    if (displayName) fd.append("displayName", displayName);
-    if (note)        fd.append("note", note);
-    if (selectedTags.length) fd.append("tags", selectedTags.join(","));
-    const result = await uploadClientDocument(fd);
+
+    // Step 1: get presigned URL from server (tiny request — no file body)
+    const { signedUrl, token, path, error: urlError } = await getUploadUrl(file.name);
+    if (urlError) {
+      setUploadError(urlError);
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
+    // Step 2: upload directly to Supabase Storage via SDK — bypasses Vercel body limit
+    const supabase = createClient();
+    const { error: uploadErr } = await supabase.storage
+      .from("client-files")
+      .uploadToSignedUrl(path, token, file, {
+        contentType: file.type || "application/octet-stream",
+      });
+    if (uploadErr) {
+      setUploadError(uploadErr.message);
+      setUploading(false);
+      if (inputRef.current) inputRef.current.value = "";
+      return;
+    }
+
+    // Step 3: record metadata in DB
+    const { error: recError } = await recordUploadedFile({
+      path,
+      filename:    file.name,
+      displayName: displayName || null,
+      note:        note || null,
+      tags:        selectedTags,
+      sizeBytes:   file.size,
+    });
     setUploading(false);
-    if (result.error) {
-      setUploadError(result.error);
+    if (recError) {
+      setUploadError(recError);
     } else {
       setShowForm(false);
       setDisplayName(""); setNote(""); setSelectedTags([]);
+      router.refresh();
     }
     if (inputRef.current) inputRef.current.value = "";
   }
@@ -126,7 +157,7 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
                   type="text"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="הוסיפי הערה קצרה..."
+                  placeholder="הוסף/י הערה קצרה..."
                   className="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm bg-white focus:outline-none focus:border-[#1CA9C9]/50 focus:ring-1 focus:ring-[#1CA9C9]/20"
                   dir="rtl"
                 />
@@ -157,7 +188,7 @@ export function DocumentsList({ files }: { files: FileRow[] }) {
               disabled={uploading}
               className="w-full py-2.5 rounded-xl bg-[#1CA9C9] text-white text-sm font-semibold hover:bg-[#1898B5] transition-colors disabled:opacity-50"
             >
-              {uploading ? "מעלה..." : "בחרי קובץ והעלי →"}
+              {uploading ? "מעלה..." : "בחר/י קובץ והעל/י →"}
             </button>
             {uploadError && <p className="text-xs text-red-500">{uploadError}</p>}
           </div>

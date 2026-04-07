@@ -1,16 +1,33 @@
 "use server";
 
-import { createClient } from "@/lib/supabase/server";
+import { createClient, createAdminClient } from "@/lib/supabase/server";
 import { encrypt } from "@/lib/crypto";
 import { revalidatePath } from "next/cache";
 
 export async function setPassword(password: string) {
+  // Get user ID from the invite session (user is authenticated at this point)
   const supabase = await createClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  const { error } = await supabase.auth.updateUser({ password });
+  // Use admin client ONLY — bypasses Supabase "Secure password change" flow.
+  // updateUser() via user session marks the change as PENDING until the user
+  // clicks a confirmation email, so signInWithPassword fails after logout.
+  // Admin updateUserById sets the password immediately with no pending state,
+  // and email_confirm:true ensures email_confirmed_at is set.
+  const admin = createAdminClient();
+  const { error } = await admin.auth.admin.updateUserById(user.id, { password, email_confirm: true });
   if (error) throw new Error(error.message);
+
+  // Sign in immediately with the new password to swap the invite session for a
+  // regular password-based session. Without this, the browser holds an invite
+  // token; after sign-out Supabase may reject the next signInWithPassword.
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email!,
+    password,
+  });
+  if (signInError) throw new Error(signInError.message);
+
   return { success: true };
 }
 
