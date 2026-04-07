@@ -25,6 +25,67 @@ export async function getClientFiles() {
   return data ?? [];
 }
 
+// ── Presigned upload URL (bypasses Vercel body limit entirely) ──────────────
+export async function getUploadUrl(filename: string): Promise<{
+  signedUrl: string; token: string; path: string; error: string | null;
+}> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { signedUrl: "", token: "", path: "", error: "לא מחובר" };
+
+    const { data: client } = await supabase
+      .from("clients").select("id").eq("user_id", user.id).single();
+    if (!client) return { signedUrl: "", token: "", path: "", error: "לקוח לא נמצא" };
+
+    const safeName = filename.replace(/[^\w\-\.]/g, "_").slice(0, 80);
+    const path = `${client.id}/${Date.now()}_${safeName}`;
+
+    const admin = createAdminClient();
+    const { data, error } = await admin.storage
+      .from("client-files")
+      .createSignedUploadUrl(path);
+    if (error) return { signedUrl: "", token: "", path: "", error: error.message };
+    return { signedUrl: data.signedUrl, token: data.token, path, error: null };
+  } catch (e: unknown) {
+    return { signedUrl: "", token: "", path: "", error: (e as Error).message };
+  }
+}
+
+export async function recordUploadedFile(params: {
+  path: string; filename: string; displayName: string | null;
+  note: string | null; tags: string[]; sizeBytes: number;
+}): Promise<{ error: string | null }> {
+  try {
+    const supabase = await createClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { error: "לא מחובר" };
+
+    const { data: client } = await supabase
+      .from("clients").select("id").eq("user_id", user.id).single();
+    if (!client) return { error: "לקוח לא נמצא" };
+
+    const admin = createAdminClient();
+    const { error } = await admin.from("client_files").insert({
+      client_id:    client.id,
+      filename:     params.filename,
+      display_name: params.displayName,
+      note:         params.note,
+      tags:         params.tags,
+      storage_path: params.path,
+      file_type:    "other",
+      size_bytes:   params.sizeBytes,
+      uploaded_by:  "client",
+    });
+    if (error) return { error: error.message };
+    revalidatePath("/documents");
+    return { error: null };
+  } catch (e: unknown) {
+    return { error: (e as Error).message };
+  }
+}
+
+// ── Legacy fallback (kept for compatibility) ─────────────────────────────────
 export async function uploadClientDocument(formData: FormData): Promise<{ error: string | null }> {
   try {
     // Use the user-session client so Storage RLS policies apply
@@ -53,14 +114,15 @@ export async function uploadClientDocument(formData: FormData): Promise<{ error:
     const ext = file.name.split(".").pop() ?? "bin";
     const storagePath = `${client.id}/${Date.now()}_${safeName}.${ext}`;
 
-    // Upload via user-session client → Storage RLS "storage_insert_own" policy enforced
-    const { error: uploadError } = await supabase.storage
+    // Upload via admin client to bypass Storage RLS (server action is already auth-gated above)
+    const admin = createAdminClient();
+    const { error: uploadError } = await admin.storage
       .from("client-files")
       .upload(storagePath, file, { upsert: false });
     if (uploadError) return { error: uploadError.message };
 
-    // DB insert via user-session client → "files_insert_own" RLS policy enforced
-    const { error: dbError } = await supabase.from("client_files").insert({
+    // DB insert via admin client
+    const { error: dbError } = await admin.from("client_files").insert({
       client_id:    client.id,
       filename:     file.name,
       display_name: displayName,
@@ -73,7 +135,7 @@ export async function uploadClientDocument(formData: FormData): Promise<{ error:
     });
     if (dbError) {
       // Clean up orphaned storage object if DB insert failed
-      await supabase.storage.from("client-files").remove([storagePath]);
+      await admin.storage.from("client-files").remove([storagePath]);
       return { error: dbError.message };
     }
 
