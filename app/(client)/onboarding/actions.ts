@@ -10,23 +10,15 @@ export async function setPassword(password: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  // Use admin client ONLY — bypasses Supabase "Secure password change" flow.
-  // updateUser() via user session marks the change as PENDING until the user
-  // clicks a confirmation email, so signInWithPassword fails after logout.
-  // Admin updateUserById sets the password immediately with no pending state,
-  // and email_confirm:true ensures email_confirmed_at is set.
+  // Use admin client — bypasses Supabase "Secure password change" flow which
+  // marks the change as PENDING until email confirmation. Admin updateUserById
+  // sets the password immediately with no pending state.
   const admin = createAdminClient();
-  const { error } = await admin.auth.admin.updateUserById(user.id, { password, email_confirm: true });
-  if (error) throw new Error(error.message);
-
-  // Sign in immediately with the new password to swap the invite session for a
-  // regular password-based session. Without this, the browser holds an invite
-  // token; after sign-out Supabase may reject the next signInWithPassword.
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: user.email!,
+  const { error } = await admin.auth.admin.updateUserById(user.id, {
     password,
+    email_confirm: true,
   });
-  if (signInError) throw new Error(signInError.message);
+  if (error) throw new Error(error.message);
 
   return { success: true };
 }

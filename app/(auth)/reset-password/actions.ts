@@ -44,17 +44,5 @@ export async function updatePasswordAction(
     return { error: error.message };
   }
 
-  // Sign in immediately with the new password to swap the recovery session for a
-  // regular password-based session. Without this the browser holds a recovery
-  // token; after sign-out Supabase rejects the next signInWithPassword.
-  const { error: signInError } = await supabase.auth.signInWithPassword({
-    email: user.email!,
-    password,
-  });
-  if (signInError) {
-    console.error("[reset-password] signInWithPassword error:", signInError.message);
-    return { error: signInError.message };
-  }
-
   redirect("/dashboard");
 }
