@@ -25,6 +25,17 @@ export async function setPassword(password: string) {
     throw new Error((e as Error).message ?? "שגיאה בעדכון הסיסמה");
   }
 
+  // admin.updateUserById invalidates the invite session. Sign in with the new
+  // password immediately to create a fresh valid session in the response cookies.
+  const { error: signInError } = await supabase.auth.signInWithPassword({
+    email: user.email!,
+    password,
+  });
+  if (signInError) {
+    console.error("[onboarding] signInWithPassword error:", signInError.message);
+    // Non-fatal: password was set, user can log in manually later
+  }
+
   return { success: true };
 }
 
