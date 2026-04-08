@@ -10,15 +10,20 @@ export async function setPassword(password: string) {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Not authenticated");
 
-  // Use admin client — bypasses Supabase "Secure password change" flow which
-  // marks the change as PENDING until email confirmation. Admin updateUserById
-  // sets the password immediately with no pending state.
-  const admin = createAdminClient();
-  const { error } = await admin.auth.admin.updateUserById(user.id, {
-    password,
-    email_confirm: true,
-  });
-  if (error) throw new Error(error.message);
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    throw new Error("שגיאת שרת: SUPABASE_SERVICE_ROLE_KEY חסר — הוסיפי אותו ב-Vercel");
+  }
+
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.auth.admin.updateUserById(user.id, {
+      password,
+      email_confirm: true,
+    });
+    if (error) throw new Error(error.message);
+  } catch (e: unknown) {
+    throw new Error((e as Error).message ?? "שגיאה בעדכון הסיסמה");
+  }
 
   return { success: true };
 }

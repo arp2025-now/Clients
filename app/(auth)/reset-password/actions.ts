@@ -29,19 +29,22 @@ export async function updatePasswordAction(
     return { error: "קישור האיפוס פג תוקף. בקשי קישור חדש." };
   }
 
-  // Use admin client to bypass Supabase "Secure password change" flow.
-  // supabase.auth.updateUser() via recovery session can mark the change as
-  // PENDING until the user clicks a confirmation email, causing signInWithPassword
-  // to fail after logout. Admin updateUserById sets the password immediately.
-  const admin = createAdminClient();
-  const { error } = await admin.auth.admin.updateUserById(user.id, {
-    password,
-    email_confirm: true,
-  });
-  console.log("[reset-password] updateUserById error:", error?.message ?? "none");
+  if (!process.env.SUPABASE_SERVICE_ROLE_KEY) {
+    console.error("[reset-password] SUPABASE_SERVICE_ROLE_KEY is not set");
+    return { error: "שגיאת הגדרות שרת — פנה למנהל" };
+  }
 
-  if (error) {
-    return { error: error.message };
+  try {
+    const admin = createAdminClient();
+    const { error } = await admin.auth.admin.updateUserById(user.id, {
+      password,
+      email_confirm: true,
+    });
+    console.log("[reset-password] updateUserById error:", error?.message ?? "none");
+    if (error) return { error: error.message };
+  } catch (e: unknown) {
+    console.error("[reset-password] admin error:", e);
+    return { error: "שגיאה בעדכון הסיסמה — נסי שוב" };
   }
 
   redirect("/dashboard");
