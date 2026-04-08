@@ -12,29 +12,37 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function LoginPage() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [error, setError] = useState("");
+  const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
     e.preventDefault();
     setError("");
     setLoading(true);
 
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    });
+    const form     = e.currentTarget;
+    const email    = (form.elements.namedItem("email")    as HTMLInputElement).value.trim();
+    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
-    if (authError) {
-      setError("אימייל או סיסמה שגויים. נסי שוב.");
+    try {
+      const supabase = createClient();
+      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+
+      if (authError) {
+        setError(authError.message);
+        setLoading(false);
+        return;
+      }
+
+      // router.refresh() forces Next.js to re-read session cookies from the server
+      // before navigating, preventing the "blank screen / redirect back to login" bug
+      // that occurs when the server hasn't seen the new session yet.
+      router.refresh();
+      router.push("/dashboard");
+    } catch (err: unknown) {
+      setError((err as Error).message ?? "שגיאת התחברות");
       setLoading(false);
-      return;
     }
-
-    router.push("/dashboard");
   }
 
   return (
@@ -55,7 +63,7 @@ export default function LoginPage() {
           <CardHeader className="pb-2 text-center">
             <h1 className="text-xl font-bold">כניסה לפורטל</h1>
             <p className="text-sm text-muted-foreground mt-1">
-              הכניסי את פרטי הגישה שקיבלת מענת
+              הכניסו את פרטי הגישה שקיבלתם מענת
             </p>
           </CardHeader>
           <CardContent>
@@ -70,11 +78,10 @@ export default function LoginPage() {
                 <Label htmlFor="email">אימייל</Label>
                 <Input
                   id="email"
+                  name="email"
                   type="email"
                   dir="ltr"
                   placeholder="your@email.com"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
                   required
                   autoComplete="email"
                 />
@@ -83,20 +90,16 @@ export default function LoginPage() {
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
                   <Label htmlFor="password">סיסמה</Label>
-                  <Link
-                    href="/forgot-password"
-                    className="text-xs text-[#1CA9C9] hover:underline"
-                  >
+                  <Link href="/forgot-password" className="text-xs text-[#1CA9C9] hover:underline">
                     שכחתי סיסמה
                   </Link>
                 </div>
                 <Input
                   id="password"
+                  name="password"
                   type="password"
                   dir="ltr"
                   placeholder="••••••••"
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
                   required
                   autoComplete="current-password"
                 />
@@ -107,12 +110,12 @@ export default function LoginPage() {
                 className="w-full ap-gradient text-white font-semibold"
                 disabled={loading}
               >
-                {loading ? "מתחברת..." : "כניסה"}
+                {loading ? "מתחבר/ת..." : "כניסה"}
               </Button>
             </form>
 
             <p className="text-center text-xs text-muted-foreground mt-6">
-              אין לך גישה? צרי קשר עם{" "}
+              אין גישה? צרו קשר עם{" "}
               <a href="mailto:office@apauto.co.il" className="text-[#1CA9C9] hover:underline">
                 ענת
               </a>
