@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useEffect } from "react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
@@ -10,7 +11,14 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 import { updatePasswordAction } from "./actions";
 
 export default function ResetPasswordPage() {
+  const router = useRouter();
   const [state, formAction, isPending] = useActionState(updatePasswordAction, null);
+
+  useEffect(() => {
+    if (state && "success" in state) {
+      router.push(state.redirectTo);
+    }
+  }, [state, router]);
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -66,7 +74,7 @@ export default function ResetPasswordPage() {
                 className="w-full ap-gradient text-white font-semibold"
                 disabled={isPending}
               >
-                {isPending ? "שומרת..." : "עדכני סיסמה"}
+                {isPending ? "שומר/ת..." : "עדכון סיסמה"}
               </Button>
 
               <Link

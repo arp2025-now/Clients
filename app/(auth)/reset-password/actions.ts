@@ -1,9 +1,8 @@
 "use server";
 
 import { createClient, createAdminClient } from "@/lib/supabase/server";
-import { redirect } from "next/navigation";
 
-export type ResetState = { error: string } | { success: true } | null;
+export type ResetState = { error: string } | { success: true; redirectTo: string } | null;
 
 export async function updatePasswordAction(
   _prev: ResetState,
@@ -47,5 +46,5 @@ export async function updatePasswordAction(
     return { error: "שגיאה בעדכון הסיסמה — נסי שוב" };
   }
 
-  redirect("/dashboard");
+  return { success: true, redirectTo: "/dashboard" };
 }
