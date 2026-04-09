@@ -619,3 +619,44 @@ export async function exportClientFilesCSV(clientId: string): Promise<string> {
   }));
   return toCSV(rows as Record<string, unknown>[]);
 }
+
+export async function setClientPassword(userId: string, password: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await requireAdmin();
+    // email_confirm: true ensures the account is fully active regardless of
+    // whether the client completed the original invite/onboarding flow.
+    const { error } = await supabase.auth.admin.updateUserById(userId, {
+      password,
+      email_confirm: true,
+    });
+    return { error: error?.message ?? null };
+  } catch (e: unknown) {
+    return { error: (e as Error).message };
+  }
+}
+
+export async function deleteClient(clientId: string, userId: string): Promise<{ error: string | null }> {
+  try {
+    const supabase = await requireAdmin();
+
+    // Delete all storage files for this client
+    const { data: files } = await supabase
+      .from("client_files")
+      .select("storage_path")
+      .eq("client_id", clientId);
+
+    if (files && files.length > 0) {
+      const paths = files.map((f) => f.storage_path);
+      await supabase.storage.from("client-files").remove(paths);
+    }
+
+    // Delete the auth user — cascades to clients row via FK
+    const { error } = await supabase.auth.admin.deleteUser(userId);
+    if (error) return { error: error.message };
+
+    revalidatePath("/admin");
+    return { error: null };
+  } catch (e: unknown) {
+    return { error: (e as Error).message };
+  }
+}
