@@ -1,52 +1,30 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState, useEffect } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { loginAction, type LoginState } from "./actions";
+
+function friendlyError(msg: string) {
+  if (msg.includes("Invalid login credentials")) return "אימייל או סיסמה שגויים";
+  if (msg.includes("Email not confirmed")) return "האימייל טרם אומת — בדקי את תיבת הדואר";
+  return msg;
+}
 
 export default function LoginPage() {
-  const [error, setError]     = useState("");
-  const [loading, setLoading] = useState(false);
+  const [state, formAction, isPending] = useActionState<LoginState, FormData>(loginAction, null);
 
-  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const form     = e.currentTarget;
-    const email    = (form.elements.namedItem("email")    as HTMLInputElement).value.trim();
-    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
-
-    try {
-      const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-
-      if (authError) {
-        // Show Hebrew-friendly error messages
-        const msg =
-          authError.message.includes("Invalid login credentials")
-            ? "אימייל או סיסמה שגויים"
-            : authError.message.includes("Email not confirmed")
-            ? "האימייל טרם אומת — בדקי את תיבת הדואר"
-            : authError.message;
-        setError(msg);
-        setLoading(false);
-        return;
-      }
-
-      // Hard navigation ensures all fresh cookies are sent to the server.
-      // router.push is client-side and may race with cookie propagation.
-      window.location.href = "/dashboard";
-    } catch (err: unknown) {
-      setError((err as Error).message ?? "שגיאת התחברות");
-      setLoading(false);
+  useEffect(() => {
+    if (state && "redirectTo" in state) {
+      window.location.href = state.redirectTo;
     }
-  }
+  }, [state]);
+
+  const errorMsg = state && "error" in state ? friendlyError(state.error) : null;
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -70,10 +48,10 @@ export default function LoginPage() {
             </p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
+            <form action={formAction} className="space-y-4">
+              {errorMsg && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription>{errorMsg}</AlertDescription>
                 </Alert>
               )}
 
@@ -111,9 +89,9 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="w-full ap-gradient text-white font-semibold"
-                disabled={loading}
+                disabled={isPending}
               >
-                {loading ? "מתחבר/ת..." : "כניסה"}
+                {isPending ? "מתחבר/ת..." : "כניסה"}
               </Button>
             </form>
 
