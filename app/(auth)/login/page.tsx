@@ -1,7 +1,6 @@
 "use client";
 
 import { useState } from "react";
-import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
@@ -11,7 +10,6 @@ import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
 export default function LoginPage() {
-  const router = useRouter();
   const [error, setError]     = useState("");
   const [loading, setLoading] = useState(false);
 
@@ -29,16 +27,21 @@ export default function LoginPage() {
       const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
       if (authError) {
-        setError(authError.message);
+        // Show Hebrew-friendly error messages
+        const msg =
+          authError.message.includes("Invalid login credentials")
+            ? "אימייל או סיסמה שגויים"
+            : authError.message.includes("Email not confirmed")
+            ? "האימייל טרם אומת — בדקי את תיבת הדואר"
+            : authError.message;
+        setError(msg);
         setLoading(false);
         return;
       }
 
-      // router.refresh() forces Next.js to re-read session cookies from the server
-      // before navigating, preventing the "blank screen / redirect back to login" bug
-      // that occurs when the server hasn't seen the new session yet.
-      router.refresh();
-      router.push("/dashboard");
+      // Hard navigation ensures all fresh cookies are sent to the server.
+      // router.push is client-side and may race with cookie propagation.
+      window.location.href = "/dashboard";
     } catch (err: unknown) {
       setError((err as Error).message ?? "שגיאת התחברות");
       setLoading(false);
