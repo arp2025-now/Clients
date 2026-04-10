@@ -1,45 +1,21 @@
 "use client";
 
-import { useState } from "react";
+import { useActionState } from "react";
 import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
+import { loginAction } from "./actions";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 
+type LoginState = { error: string } | null;
+
 export default function LoginPage() {
-  const [error, setError]     = useState("");
-  const [loading, setLoading] = useState(false);
-
-  async function handleSubmit(e: React.SyntheticEvent<HTMLFormElement>) {
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    const form     = e.currentTarget;
-    const email    = (form.elements.namedItem("email")    as HTMLInputElement).value.trim();
-    const password = (form.elements.namedItem("password") as HTMLInputElement).value;
-
-    const supabase = createClient();
-    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (authError) {
-      const msg =
-        authError.message.includes("Invalid login credentials")
-          ? "אימייל או סיסמה שגויים"
-          : authError.message.includes("Email not confirmed")
-          ? "האימייל טרם אומת — פנה לענת"
-          : authError.message;
-      setError(msg);
-      setLoading(false);
-      return;
-    }
-
-    // Navigate to /dashboard — proxy.ts will redirect admins to /admin automatically
-    window.location.href = "/dashboard";
-  }
+  const [state, formAction, isPending] = useActionState<LoginState, FormData>(
+    loginAction,
+    null
+  );
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -63,10 +39,12 @@ export default function LoginPage() {
             </p>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              {error && (
+            <form action={formAction} className="space-y-4">
+              {state?.error && (
                 <Alert variant="destructive">
-                  <AlertDescription>{error}</AlertDescription>
+                  <AlertDescription className="text-sm font-medium">
+                    {state.error}
+                  </AlertDescription>
                 </Alert>
               )}
 
@@ -104,9 +82,9 @@ export default function LoginPage() {
               <Button
                 type="submit"
                 className="w-full ap-gradient text-white font-semibold"
-                disabled={loading}
+                disabled={isPending}
               >
-                {loading ? "מתחבר/ת..." : "כניסה"}
+                {isPending ? "מתחבר/ת..." : "כניסה"}
               </Button>
             </form>
 
