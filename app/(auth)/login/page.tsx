@@ -24,7 +24,7 @@ export default function LoginPage() {
     setGoogleLoading(true);
     setGoogleError("");
     const supabase = createClient();
-    const { error } = await supabase.auth.signInWithOAuth({
+    const { data, error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
@@ -33,8 +33,15 @@ export default function LoginPage() {
     if (error) {
       setGoogleError(error.message);
       setGoogleLoading(false);
+      return;
     }
-    // On success the browser redirects to Google — loading stays true
+    // Manually redirect to Google — @supabase/ssr browser client doesn't auto-redirect
+    if (data?.url) {
+      window.location.href = data.url;
+    } else {
+      setGoogleError("לא ניתן להתחבר עם Google — בדקי שהספק מוגדר ב-Supabase");
+      setGoogleLoading(false);
+    }
   }
 
   return (
