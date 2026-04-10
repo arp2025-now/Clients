@@ -1,8 +1,9 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState, useTransition } from "react";
 import Link from "next/link";
 import { loginAction } from "./actions";
+import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -11,17 +12,35 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 
 type LoginState = { error: string } | null;
 
-// Built at compile time — hardcoded to avoid any runtime issues
-const GOOGLE_OAUTH_URL =
-  `${process.env.NEXT_PUBLIC_SUPABASE_URL}/auth/v1/authorize` +
-  `?provider=google` +
-  `&redirect_to=${encodeURIComponent("https://clients-green-seven.vercel.app/auth/callback")}`;
-
 export default function LoginPage() {
   const [state, formAction, isPending] = useActionState<LoginState, FormData>(
     loginAction,
     null
   );
+  const [googleError, setGoogleError] = useState("");
+  const [, startTransition] = useTransition();
+
+  function handleGoogleLogin() {
+    startTransition(async () => {
+      setGoogleError("");
+      const supabase = createClient();
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: "https://clients-green-seven.vercel.app/auth/callback",
+        },
+      });
+      if (error) {
+        setGoogleError(error.message);
+        return;
+      }
+      if (data?.url) {
+        window.location.href = data.url;
+      } else {
+        setGoogleError("שגיאה: Google לא מוגדר ב-Supabase");
+      }
+    });
+  }
 
   return (
     <div className="min-h-screen flex items-center justify-center bg-background px-4">
@@ -46,10 +65,18 @@ export default function LoginPage() {
           </CardHeader>
           <CardContent className="space-y-4">
 
-            {/* Google OAuth — plain <a> tag, cannot be disabled or blocked */}
-            <a
-              href={GOOGLE_OAUTH_URL}
-              className="flex items-center justify-center gap-2 w-full rounded-md border border-input bg-background px-4 py-2.5 text-sm font-medium hover:bg-accent hover:text-accent-foreground transition-colors"
+            {googleError && (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm font-medium">{googleError}</AlertDescription>
+              </Alert>
+            )}
+
+            <Button
+              type="button"
+              variant="outline"
+              className="w-full gap-2 font-medium"
+              onClick={handleGoogleLogin}
+              disabled={isPending}
             >
               <svg width="18" height="18" viewBox="0 0 18 18" xmlns="http://www.w3.org/2000/svg">
                 <path d="M17.64 9.2c0-.637-.057-1.251-.164-1.84H9v3.481h4.844c-.209 1.125-.843 2.078-1.796 2.717v2.258h2.908c1.702-1.567 2.684-3.875 2.684-6.615z" fill="#4285F4"/>
@@ -58,7 +85,7 @@ export default function LoginPage() {
                 <path d="M9 3.58c1.321 0 2.508.454 3.44 1.345l2.582-2.58C13.463.891 11.426 0 9 0A8.997 8.997 0 0 0 .957 4.961L3.964 7.293C4.672 5.163 6.656 3.58 9 3.58z" fill="#EA4335"/>
               </svg>
               כניסה עם Google
-            </a>
+            </Button>
 
             <div className="flex items-center gap-3">
               <div className="flex-1 h-px bg-border" />
@@ -66,7 +93,6 @@ export default function LoginPage() {
               <div className="flex-1 h-px bg-border" />
             </div>
 
-            {/* Email + Password form */}
             <form action={formAction} className="space-y-4">
               {state?.error && (
                 <Alert variant="destructive">
