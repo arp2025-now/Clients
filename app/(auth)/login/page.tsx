@@ -3,7 +3,6 @@
 import { useActionState, useState } from "react";
 import Link from "next/link";
 import { loginAction } from "./actions";
-import { createClient } from "@/lib/supabase/client";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,28 +19,13 @@ export default function LoginPage() {
   const [googleLoading, setGoogleLoading] = useState(false);
   const [googleError, setGoogleError] = useState("");
 
-  async function handleGoogleLogin() {
+  function handleGoogleLogin() {
     setGoogleLoading(true);
     setGoogleError("");
-    const supabase = createClient();
-    const { data, error } = await supabase.auth.signInWithOAuth({
-      provider: "google",
-      options: {
-        redirectTo: `${window.location.origin}/auth/callback`,
-      },
-    });
-    if (error) {
-      setGoogleError(error.message);
-      setGoogleLoading(false);
-      return;
-    }
-    // Manually redirect to Google — @supabase/ssr browser client doesn't auto-redirect
-    if (data?.url) {
-      window.location.href = data.url;
-    } else {
-      setGoogleError("לא ניתן להתחבר עם Google — בדקי שהספק מוגדר ב-Supabase");
-      setGoogleLoading(false);
-    }
+    // Direct redirect to Supabase OAuth endpoint — bypasses SDK quirks
+    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+    const redirectTo = encodeURIComponent(`${window.location.origin}/auth/callback`);
+    window.location.href = `${supabaseUrl}/auth/v1/authorize?provider=google&redirect_to=${redirectTo}`;
   }
 
   return (
