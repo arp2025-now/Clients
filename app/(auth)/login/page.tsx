@@ -3,7 +3,6 @@
 import { useState } from "react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
-import { getLoginRedirect } from "./actions";
 import { Card, CardContent, CardHeader } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -23,29 +22,23 @@ export default function LoginPage() {
     const email    = (form.elements.namedItem("email")    as HTMLInputElement).value.trim();
     const password = (form.elements.namedItem("password") as HTMLInputElement).value;
 
-    try {
-      const supabase = createClient();
-      const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
+    const supabase = createClient();
+    const { error: authError } = await supabase.auth.signInWithPassword({ email, password });
 
-      if (authError) {
-        const msg =
-          authError.message.includes("Invalid login credentials")
-            ? "אימייל או סיסמה שגויים"
-            : authError.message.includes("Email not confirmed")
-            ? "האימייל טרם אומת — בדקי את תיבת הדואר"
-            : authError.message;
-        setError(msg);
-        setLoading(false);
-        return;
-      }
-
-      // Auth succeeded — ask server where to redirect (admin vs client)
-      const redirectTo = await getLoginRedirect();
-      window.location.href = redirectTo;
-    } catch (err: unknown) {
-      setError((err as Error).message ?? "שגיאת התחברות");
+    if (authError) {
+      const msg =
+        authError.message.includes("Invalid login credentials")
+          ? "אימייל או סיסמה שגויים"
+          : authError.message.includes("Email not confirmed")
+          ? "האימייל טרם אומת — פנה לענת"
+          : authError.message;
+      setError(msg);
       setLoading(false);
+      return;
     }
+
+    // Navigate to /dashboard — proxy.ts will redirect admins to /admin automatically
+    window.location.href = "/dashboard";
   }
 
   return (

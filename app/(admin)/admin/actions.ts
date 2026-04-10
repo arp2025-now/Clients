@@ -621,16 +621,31 @@ export async function exportClientFilesCSV(clientId: string): Promise<string> {
 }
 
 export async function setClientPassword(userId: string, password: string): Promise<{ error: string | null }> {
+  if (!userId) {
+    console.error("[setClientPassword] userId is null/undefined — client has no auth user linked");
+    return { error: "הלקוח הזה אינו מקושר לחשבון — שלח לו הזמנה קודם" };
+  }
+
   try {
     const supabase = await requireAdmin();
+    console.log("[setClientPassword] updating password for userId:", userId);
+
     // email_confirm: true ensures the account is fully active regardless of
     // whether the client completed the original invite/onboarding flow.
     const { error } = await supabase.auth.admin.updateUserById(userId, {
       password,
       email_confirm: true,
     });
-    return { error: error?.message ?? null };
+
+    if (error) {
+      console.error("[setClientPassword] updateUserById error:", error.message);
+      return { error: error.message };
+    }
+
+    console.log("[setClientPassword] password updated successfully for userId:", userId);
+    return { error: null };
   } catch (e: unknown) {
+    console.error("[setClientPassword] exception:", (e as Error).message);
     return { error: (e as Error).message };
   }
 }
