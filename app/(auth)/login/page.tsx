@@ -18,17 +18,23 @@ export default function LoginPage() {
     null
   );
   const [googleLoading, setGoogleLoading] = useState(false);
+  const [googleError, setGoogleError] = useState("");
 
   async function handleGoogleLogin() {
     setGoogleLoading(true);
+    setGoogleError("");
     const supabase = createClient();
-    await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: "google",
       options: {
         redirectTo: `${window.location.origin}/auth/callback`,
       },
     });
-    // Browser redirects to Google — no need to reset loading
+    if (error) {
+      setGoogleError(error.message);
+      setGoogleLoading(false);
+    }
+    // On success the browser redirects to Google — loading stays true
   }
 
   return (
@@ -55,6 +61,11 @@ export default function LoginPage() {
           <CardContent className="space-y-4">
 
             {/* Google OAuth */}
+            {googleError && (
+              <Alert variant="destructive">
+                <AlertDescription className="text-sm font-medium">{googleError}</AlertDescription>
+              </Alert>
+            )}
             <Button
               type="button"
               variant="outline"
